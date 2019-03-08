@@ -16,9 +16,9 @@ float sd_sphere(vec3 point, float r)
 	return length(point) - r;
 }
 
-float sd_box(vec3 point, vec3 b)
+float sd_box(vec3 point, vec3 b, float r)
 {
-	return length(max(abs(point) - b, 0.0f));
+	return length(max(abs(point) - b, 0.0f)) - r;
 }
 
 float sd_intersect(float sda, float sdb)
@@ -29,6 +29,12 @@ float sd_intersect(float sda, float sdb)
 float sd_union(float sd_a, float sd_b)
 {
 	return min(sd_a, sd_b);
+}
+
+float sd_smooth_union(float sda, float sdb, float k)
+{
+    float h = clamp(0.5f + 0.5f*(sdb-sda)/k, 0.0f, 1.0f);
+    return mix(sdb, sda, h) - k*h*(1.0f-h);
 }
 
 float sd_difference(float sda, float sdb)
@@ -53,17 +59,10 @@ vec3 sd_rotate(vec3 point, float theta)
 
 float sd_scene(vec3 point)
 {
-	float change = sin(change) / 2.0f + 0.5f;
+    float box = sd_box(sd_translate(point, vec3(0.0f, -0.5f, 0.0f)), vec3(0.5f, 0.5f, 0.5f), 0.05f);
+    float sphere = sd_sphere(point, 0.5f);
 
-	vec3 sda_point = sd_rotate(point, time);
-	sda_point = sd_translate(sda_point, vec3(-1.0f, 0.0f, 0.0f));
-	float sda = sd_box(sda_point, vec3(0.5f, 0.5f, 0.5f));
-
-	vec3 sdb_point = sd_rotate(point, time);
-	sdb_point = sd_translate(sdb_point, vec3(1.0f, 0.0f, 0.0f));
-	float sdb = sd_box(sdb_point / change, vec3(0.5f, 0.5f, 0.5f)) * change;
-
-	return sd_union(sdb, sda);
+    return sd_smooth_union(box, sphere, 0.05f);
 }
 
 float shortest_distance_to_surface(vec3 eye, vec3 dir, float start, float end)
@@ -127,7 +126,7 @@ vec3 phong_illumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha,
 	vec3 ambient_light = 0.5 * vec3(1.0f, 1.0f, 1.0f);
 	vec3 tmp_color = k_a * ambient_light;
 
-	vec3 light_pos = vec3(5.0f * cos(change), 0.0f, 5.0f * sin(change));
+	vec3 light_pos = vec3(10.0f, 30.0f, -10.0f);
 	vec3 light_intensity = vec3(0.4f, 0.4f, 0.4f);
 	tmp_color += phong_light_contrib(k_d, k_s, alpha, p, eye,
                                      light_pos, light_intensity);
@@ -164,10 +163,10 @@ void main()
 	}
 
 	vec3 p = eye + dist * dir;
-	vec3 k_a = vec3(0.2f, 0.2f, 0.2f);
-	vec3 k_d = vec3(0.7f, 0.5f, 0.3f);
-	vec3 k_s = vec3(1.0f, 1.0f, 1.0f);
-	float shininess = 10.0f;
+	vec3 k_a = vec3(0.5f, 0.5f, 0.5f);
+	vec3 k_d = vec3(0.8f, 0.8f, 0.8f);
+	vec3 k_s = vec3(0.2f, 0.2f, 0.2f);
+	float shininess = 32.0f;
 
 	color = vec4(phong_illumination(k_a, k_d, k_s, shininess, p, eye), 1.0f);
 }

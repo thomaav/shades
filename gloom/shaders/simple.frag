@@ -14,8 +14,13 @@ const float PI = 3.1415926535897932384626433832795;
 
 float sd_plane(vec3 point)
 {
-    float dist = length(point - 0.0f);
-    return point.y + 0.7*sin(3*dist + 3*time)/(3*dist);
+    float dist = length(point);
+
+    if (dist > 7.5f)
+        return point.y;
+
+    // return point.y + 0.7*sin(5*dist + 4*time)/(5*dist);
+    return point.y + 0.03*(dist)*cos(dist*4.0f-time*4.0f);
 }
 
 float sd_sphere(vec3 point, float r)
@@ -73,14 +78,9 @@ vec3 sd_rotate(vec3 point, float theta)
 float sd_scene(vec3 point)
 {
     float plane = sd_plane(sd_translate(point, vec3(0.0f, -0.5f, 0.0f)));
-    float box = sd_box(point, vec3(0.5f, 0.0f, 0.5f), 0.01);
     float sphere = sd_sphere(sd_translate(point, vec3(0.0f, 0.5f, 0.0f)), 0.45f);
-    float sphere2 = sd_sphere(sd_translate(point, vec3(0.0f, 1.1f, 0.0f)), 0.45f);
-    sphere2 = sphere2 + 0.05*sd_displace(point);
 
-    float scene = sd_smooth_union(box, sphere, 0.05f);
-    scene = sd_smooth_union(sphere2, scene, 0.05f);
-    return sd_smooth_union(plane, scene, 0.05f);
+    return sd_smooth_union(plane, sphere, 0.05f);
 }
 
 float ray_march(vec3 eye, vec3 dir, float start, float end)
@@ -164,7 +164,7 @@ vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
 
     vec3 diffuse_light_intensity = light_intensity;
     if (p.y < 0.0f)
-        diffuse_light_intensity = vec3(0.0f, 0.0f, 1.0f);
+        diffuse_light_intensity = vec3(0.35f, 0.74f, 0.85f);
 
     if (dot_LN < 0.0f)
         return vec3(0.0f, 0.0f, 0.0f);
@@ -172,7 +172,10 @@ vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
     if (dot_RV < 0.0f)
         return diffuse_light_intensity * (k_d * dot_LN);
 
-    float shadow = penumbra_shadow(p, L, 0.01f, 100.0f, 32.0f);
+    float shadow = 1.0f;
+    if (length(p) < 5.0f)
+        shadow = penumbra_shadow(p, L, 0.01f, 100.0f, 32.0f);
+
     return diffuse_light_intensity * k_d * dot_LN * shadow
         + light_intensity * k_s * pow(dot_RV, alpha);
 }
@@ -181,12 +184,11 @@ vec3 phong_illumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha,
                         vec3 p, vec3 eye)
 {
     float occlusion = ambient_occlusion(p, estimate_normal(p));
-    occlusion = 1.0f;
     vec3 ambient_light = 0.3 * vec3(1.0f, 1.0f, 1.0f);
     vec3 tmp_color = k_a * ambient_light * occlusion;
 
     vec3 light_pos = vec3(10.0f, 8.0f, -10.0f);
-    vec3 light_intensity = vec3(0.7f, 0.7f, 0.7f);
+    vec3 light_intensity = vec3(1.0f, 1.0f, 1.0f);
 
     tmp_color += phong_light_contrib(k_d, k_s, alpha, p, eye,
                                      light_pos, light_intensity);
@@ -224,7 +226,7 @@ void main()
     vec3 k_a = vec3(0.5f, 0.5f, 0.5f);
     vec3 k_d = vec3(0.8f, 0.8f, 0.8f);
     vec3 k_s = vec3(0.4f, 0.4f, 0.4f);
-    float shininess = 8.0f;
+    float shininess = 16.0f;
 
     vec4 tot = vec4(phong_illumination(k_a, k_d, k_s, shininess, p, eye), 1.0f);
     color = tot;

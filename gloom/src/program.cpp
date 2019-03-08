@@ -11,6 +11,7 @@ void runProgram(GLFWwindow* window)
     glDepthFunc(GL_LESS);
 
     // Configure miscellaneous OpenGL settings
+    glEnable(GL_MULTISAMPLE);
     // glEnable(GL_CULL_FACE);
 
     // Set default colour after clearing the colour buffer

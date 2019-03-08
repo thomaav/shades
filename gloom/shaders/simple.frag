@@ -110,6 +110,21 @@ vec3 estimate_normal(vec3 p)
     ));
 }
 
+float ambient_occlusion(vec3 pos, vec3 normal)
+{
+    float occ = 0.0f;
+    float sca = 1.0f;
+
+    for (int i = 0; i < 5; ++i) {
+        float h = 0.001 + 0.15*float(i)/4.0f;
+        float d = sd_scene(pos + h*normal);
+        occ += (h-d)*sca;
+        sca *= 0.95;
+    }
+
+    return clamp(1.0f - 1.5f*occ, 0.0f, 1.0f);
+}
+
 float penumbra_shadow(vec3 ro, vec3 rd, float mint, float maxt, float k)
 {
     float EPSILON = 0.001;
@@ -151,8 +166,9 @@ vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
 vec3 phong_illumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha,
                         vec3 p, vec3 eye)
 {
+    float occlusion = ambient_occlusion(p, estimate_normal(p));
     vec3 ambient_light = 0.3 * vec3(1.0f, 1.0f, 1.0f);
-    vec3 tmp_color = k_a * ambient_light;
+    vec3 tmp_color = k_a * ambient_light * occlusion;
 
     vec3 light_pos = vec3(10.0f, 8.0f, -10.0f);
     vec3 light_intensity = vec3(0.7f, 0.7f, 0.7f);

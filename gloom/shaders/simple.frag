@@ -48,6 +48,11 @@ float sd_difference(float sda, float sdb)
     return max(sda, -sdb);
 }
 
+float sd_displace(vec3 point)
+{
+    return sin(45.0f*point.x) * sin(45.0f*point.y) * sin(45.0f*point.z);
+}
+
 vec3 sd_translate(vec3 point, vec3 translation)
 {
     return point - translation;
@@ -69,6 +74,7 @@ float sd_scene(vec3 point)
     float box = sd_box(point, vec3(0.5f, 0.5f, 0.5f), 0.01);
     float sphere = sd_sphere(sd_translate(point, vec3(0.0f, 0.5f, 0.0f)), 0.45f);
     float sphere2 = sd_sphere(sd_translate(point, vec3(0.0f, 1.1f, 0.0f)), 0.45f);
+    sphere2 = sphere2 + 0.05*sd_displace(point);
 
     float scene = sd_smooth_union(box, sphere, 0.05f);
     scene = sd_smooth_union(sphere2, scene, 0.05f);
@@ -110,6 +116,8 @@ vec3 estimate_normal(vec3 p)
     ));
 }
 
+// http://delivery.acm.org/10.1145/1190000/1185834/p153-evans.pdf?ip=129.241.110.156&id=1185834&acc=ACTIVE%20SERVICE&key=CDADA77FFDD8BE08%2E5386D6A7D247483C%2E4D4702B0C3E38B35%2E4D4702B0C3E38B35&__acm__=1552050912_e7cfd8c9dad8342ae20b52e0aeabbaf2
+// http://www.iquilezles.org/www/material/nvscene2008/rwwtt.pdf
 float ambient_occlusion(vec3 pos, vec3 normal)
 {
     float occ = 0.0f;
@@ -141,7 +149,6 @@ float penumbra_shadow(vec3 ro, vec3 rd, float mint, float maxt, float k)
     return res;
 }
 
-// https://en.wikipedia.org/wiki/Phong_reflection_model#Description
 vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
                          vec3 light_pos, vec3 light_intensity)
 {
@@ -159,7 +166,7 @@ vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
     if (dot_RV < 0.0f)
         return light_intensity * (k_d * dot_LN);
 
-    float shadow = penumbra_shadow(p, normalize(light_pos - p), 0.01f, 100.0f, 32.0f);
+    float shadow = penumbra_shadow(p, L, 0.01f, 100.0f, 32.0f);
     return light_intensity * (k_d * dot_LN * shadow + k_s * pow(dot_RV, alpha));
 }
 
@@ -194,7 +201,7 @@ mat4 camera(vec3 eye, vec3 center, vec3 up)
 void main()
 {
     vec3 dir = ray_direction(45.0f, window_size, gl_FragCoord.xy);
-    vec3 eye = vec3(2.0f, 3.0f, 10.0f);
+    vec3 eye = vec3(sin(time)*5.0f, 3.0f, 10.0f);
     mat4 camera_mat = camera(eye, vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     dir = (camera_mat * vec4(dir, 1.0f)).xyz;
     float dist = ray_march(eye, dir, MIN_DIST, MAX_DIST);

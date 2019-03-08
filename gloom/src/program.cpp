@@ -1,6 +1,7 @@
 // Local headers
 #include "program.hpp"
 #include "gloom/gloom.hpp"
+#include "gloom/shader.hpp"
 
 
 void runProgram(GLFWwindow* window)
@@ -10,12 +11,38 @@ void runProgram(GLFWwindow* window)
     glDepthFunc(GL_LESS);
 
     // Configure miscellaneous OpenGL settings
-    glEnable(GL_CULL_FACE);
+    // glEnable(GL_CULL_FACE);
 
     // Set default colour after clearing the colour buffer
-    glClearColor(0.3f, 0.5f, 0.8f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-    // Set up your scene here (create Vertex Array Objects, etc.)
+    // Initialize some shaders.
+    Gloom::Shader *shader = new Gloom::Shader();
+    shader->makeBasicShader("../gloom/shaders/simple.vert", "../gloom/shaders/simple.frag");
+    shader->activate();
+
+    // Set up the scene for the fragment shader here (essentially just
+    // a quad that covers the entire screen).
+    float quad[] = {
+        -1.0f, +1.0f, 0.0f,
+        -1.0f, -1.0f, 0.0f,
+        +1.0f, +1.0f, 0.0f,
+
+        +1.0f, +1.0f, 0.0f,
+        +1.0f, -1.0f, 0.0f,
+        -1.0f, -1.0f, 0.0f,
+    };
+
+    GLuint VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
+    GLuint VBO;
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(0);
 
     // Rendering Loop
     while (!glfwWindowShouldClose(window))
@@ -23,7 +50,13 @@ void runProgram(GLFWwindow* window)
         // Clear colour and depth buffers
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Draw your scene here
+        // Pass required uniforms.
+        glUniform2f(0, windowWidth, windowHeight);
+        glUniform1f(1, (float) glfwGetTime());
+
+        // Draw calls.
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Handle other events
         glfwPollEvents();

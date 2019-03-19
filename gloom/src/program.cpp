@@ -1,7 +1,9 @@
-// Local headers
 #include "program.hpp"
 #include "gloom/gloom.hpp"
 #include "gloom/shader.hpp"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "vendor/stb_image.h"
 
 
 void runProgram(GLFWwindow* window)
@@ -45,6 +47,26 @@ void runProgram(GLFWwindow* window)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
     glEnableVertexAttribArray(0);
 
+    // Set up noise texture, exactly
+    // like. https://learnopengl.com/Getting-started/Textures.
+    int width, height, n_channels;
+    unsigned char *texture_data = stbi_load("../gloom/textures/rgbanoise.png",
+                                            &width, &height, &n_channels, 0);
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height,
+                 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_data);
+
+    stbi_image_free(texture_data);
+
     // Rendering Loop
     while (!glfwWindowShouldClose(window))
     {
@@ -54,6 +76,10 @@ void runProgram(GLFWwindow* window)
         // Pass required uniforms.
         glUniform2f(0, windowWidth, windowHeight);
         glUniform1f(1, (float) glfwGetTime());
+
+        // Make sure textures are activated.
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
 
         // Draw calls.
         glBindVertexArray(VAO);

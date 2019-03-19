@@ -5,6 +5,8 @@ out vec4 color;
 uniform layout(location=0) vec2 window_size;
 uniform layout(location=1) float time;
 
+uniform sampler2D noise_texture;
+
 const int MARCHSTEPS = 250;
 const float MIN_DIST = 0.0f;
 const float MAX_DIST = 100.0f;
@@ -15,7 +17,7 @@ const float PI = 3.1415926535897932384626433832795;
 const vec3 wave_color = vec3(0.35f, 0.74f, 0.85f);
 const vec3 sphere_color = vec3(1.0f, 1.0f, 1.0f);
 
-const vec3 scene_eye = vec3(3.0f, 4.0f, 10.0f);
+const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
 
 #define SPHERE_RADIUS 0.45f
 #define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, sin(time) * -1.0f, 0.0f)))

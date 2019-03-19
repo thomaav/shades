@@ -15,28 +15,35 @@ const float PI = 3.1415926535897932384626433832795;
 const vec3 wave_color = vec3(0.35f, 0.74f, 0.85f);
 const vec3 sphere_color = vec3(1.0f, 1.0f, 1.0f);
 
-#define SPHERE_RADIUS 0.45f
-#define sd_sphere_call (sd_sphere(sd_translate(point, vec3(0.0f, sin(time) * -1.0f, 0.0f)), SPHERE_RADIUS))
+const vec3 scene_eye = vec3(3.0f, 4.0f, 10.0f);
 
-float sd_plane(vec3 point)
+#define SPHERE_RADIUS 0.45f
+#define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, sin(time) * -1.0f, 0.0f)))
+#define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, SPHERE_RADIUS))
+
+// #define REFLECTION
+#define REFRACTION
+#define SHADOW
+// #define AO
+
+float sd_plane(vec3 p)
 {
-    return point.y;
-    float dist = length(point);
+    float dist = length(p);
 
     if (dist > 7.5f)
-        return point.y;
+        return p.y;
 
-    return point.y + 0.03*(dist)*cos(dist*6.0f-time*6.0f);
+    return p.y + 0.03*(dist)*cos(dist*5.0f-time*5.0f);
 }
 
-float sd_sphere(vec3 point, float r)
+float sd_sphere(vec3 p, float r)
 {
-    return length(point) - r;
+    return length(p) - r;
 }
 
-float sd_box(vec3 point, vec3 b, float r)
+float sd_box(vec3 p, vec3 b, float r)
 {
-    vec3 d = abs(point) - b;
+    vec3 d = abs(p) - b;
     return length(max(d, 0.0f)) - r;
 }
 
@@ -61,42 +68,42 @@ float sd_difference(float sda, float sdb)
     return max(sda, -sdb);
 }
 
-float sd_displace(vec3 point)
+float sd_displace(vec3 p)
 {
-    return sin(45.0f*point.x) * sin(45.0f*point.y) * sin(45.0f*point.z);
+    return sin(45.0f*p.x) * sin(45.0f*p.y) * sin(45.0f*p.z);
 }
 
-vec3 sd_translate(vec3 point, vec3 translation)
+vec3 sd_translate(vec3 p, vec3 translation)
 {
-    return point - translation;
+    return p - translation;
 }
 
-vec3 sd_rotate(vec3 point, float theta)
+vec3 sd_rotate(vec3 p, float theta)
 {
     return (mat4(
         vec4(cos(theta), 0.0f, sin(theta), 0.0f),
         vec4(0.0f, 1.0f, 0.0f, 0.0f),
         vec4(-sin(theta), 0.0f, cos(theta), 0.0f),
         vec4(0.0f, 0.0f, 0.0f, 1.0f)
-    ) * vec4(point, 1.0f)).xyz;
+    ) * vec4(p, 1.0f)).xyz;
 }
 
-float sd_scene(vec3 point)
+float sd_scene(vec3 p)
 {
-    float plane = sd_plane(sd_translate(point, vec3(0.0f, -0.5f, 0.0f)));
+    float plane = sd_plane(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
     float sphere = sd_sphere_call;
 
     return sd_union(plane, sphere);
 }
 
-float sd_scene_sphere(vec3 point)
+float sd_scene_sphere(vec3 p)
 {
     return sd_sphere_call;
 }
 
-float sd_scene_plane(vec3 point)
+float sd_scene_plane(vec3 p)
 {
-    return sd_plane(sd_translate(point, vec3(0.0f, -0.5f, 0.0f)));
+    return sd_plane(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
 }
 
 float trace_sphere(vec3 eye, vec3 dir, float start, float end)
@@ -142,7 +149,7 @@ vec3 ray_direction(float fov, vec2 size, vec2 fc)
     return normalize(vec3(xy, -z));
 }
 
-vec3 estimate_normal(vec3 p)
+vec3 est_normal(vec3 p)
 {
     const float EPSILON = 0.001;
     return normalize(vec3(
@@ -152,10 +159,10 @@ vec3 estimate_normal(vec3 p)
     ));
 }
 
-vec3 estimate_sphere_normal(vec3 p, float r)
+vec3 est_sphere_normal(vec3 p, float r)
 {
     const float EPSILON = 0.001;
-    p = sd_translate(p, vec3(0.0f, sin(time) * -1.0f, 0.0f));
+    p = SPHERE_TRANSLATION;
     return normalize(vec3(
         sd_sphere(vec3(p.x + EPSILON, p.y, p.z), r) - sd_sphere(vec3(p.x - EPSILON, p.y, p.z), r),
         sd_sphere(vec3(p.x, p.y + EPSILON, p.z), r) - sd_sphere(vec3(p.x, p.y - EPSILON, p.z), r),
@@ -182,7 +189,7 @@ float ambient_occlusion(vec3 pos, vec3 normal)
 
 float penumbra_shadow(vec3 ro, vec3 rd, float mint, float maxt, float k)
 {
-    float EPSILON = 0.001;
+    float EPSILON = 0.0001;
     float res = 1.0f;
 
     for (float t = mint; t < maxt;) {
@@ -217,10 +224,11 @@ vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
         return diffuse_light_intensity * (k_d * dot_LN);
 
     float shadow = 1.0f;
-    if (length(p) < 5.0f)
-        shadow = penumbra_shadow(p, L, 0.01f, 100.0f, 32.0f);
+    #ifdef SHADOW
+    if (length(p) < 5.0f && eye == scene_eye)
+        shadow = penumbra_shadow(p, L, 0.01f, 100.0f, 16.0f);
+    #endif
 
-    shadow = 1.0f;
     return diffuse_light_intensity * k_d * dot_LN * shadow
         + light_intensity * k_s * pow(dot_RV, alpha);
 }
@@ -228,8 +236,10 @@ vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
 vec3 phong_illumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha,
                         vec3 p, vec3 eye, vec3 light_intensity, vec3 normal)
 {
-    float occlusion = ambient_occlusion(p, normal);
-    occlusion = 1.0f;
+    float occlusion = 1.0f;
+    #ifdef AO
+    occlusion = ambient_occlusion(p, normal);
+    #endif
     vec3 ambient_light = 0.3 * vec3(1.0f, 1.0f, 1.0f);
     vec3 tmp_color = k_a * ambient_light * occlusion;
     vec3 light_pos = vec3(10.0f, 8.0f, -10.0f);
@@ -261,7 +271,7 @@ vec4 shade_scene()
     float shininess = 16.0f;
 
     vec3 ray_dir = ray_direction(45.0f, window_size, gl_FragCoord.xy);
-    vec3 eye = vec3(3.0f, 4.0f, 10.0f);
+    vec3 eye = scene_eye;
     mat4 camera_mat = camera(eye, vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     ray_dir = (camera_mat * vec4(ray_dir, 1.0f)).xyz;
 
@@ -274,43 +284,47 @@ vec4 shade_scene()
 
     if (dist_plane < dist_sphere) {
         vec3 p_plane = eye + dist_plane*ray_dir;
-        vec3 n_plane = estimate_normal(p_plane);
+        vec3 n_plane = est_normal(p_plane);
 
         // Standard color of water.
         vec4 col = vec4(phong_illumination(k_a, k_d, k_s, shininess, p_plane, eye, wave_color, n_plane), 1.0f);
 
         // Refraction.
+        #ifdef REFRACTION
         float raydotn = dot(ray_dir, n_plane);
         vec3 refr_ray = normalize(ray_dir + (-cos(1.10*acos(-raydotn))-raydotn)*n_plane);
         float refr_dist_sphere = trace_sphere(p_plane, refr_ray, MIN_DIST, MAX_DIST);
         if (refr_dist_sphere < MAX_DIST - EPSILON) {
             vec3 refr_p_sphere = p_plane + refr_dist_sphere*refr_ray;
-            vec3 sphere_normal = estimate_sphere_normal(refr_p_sphere, SPHERE_RADIUS);
+            vec3 sphere_normal = est_sphere_normal(refr_p_sphere, SPHERE_RADIUS);
             vec4 refr_color = vec4(phong_illumination(k_a, k_d, k_s, shininess,
                                                       refr_p_sphere, p_plane, sphere_color,
                                                       sphere_normal), 1.0f);
             col = mix(col, refr_color, exp(-refr_dist_sphere));
         }
+        #endif
 
         // Reflection.
+        #ifdef REFLECTION
         float fresnel = pow(1.0f-abs(dot(ray_dir, n_plane)), 3.0f);
         vec3 refl_dir = reflect(ray_dir, n_plane);
         float refl_dist_sphere = trace_sphere(p_plane, refl_dir, MIN_DIST, MAX_DIST);
         if (refl_dist_sphere < MAX_DIST - EPSILON) {
             vec3 refl_p_sphere = p_plane + refl_dist_sphere*refl_dir;
-            vec3 refl_sphere_n = estimate_sphere_normal(refl_p_sphere, SPHERE_RADIUS);
+            vec3 refl_sphere_n = est_sphere_normal(refl_p_sphere, SPHERE_RADIUS);
             vec4 reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess,
                                                       refl_p_sphere, p_plane, sphere_color,
                                                       refl_sphere_n), 1.0f);
             col = mix(col, reflection, fresnel);
         }
+        #endif
 
         return col;
     } else {
         vec3 p_sphere = eye + dist_sphere*ray_dir;
         return vec4(phong_illumination(k_a, k_d, k_s, shininess,
                                        p_sphere, eye, sphere_color,
-                                       estimate_sphere_normal(p_sphere, SPHERE_RADIUS)), 1.0f);
+                                       est_sphere_normal(p_sphere, SPHERE_RADIUS)), 1.0f);
     }
 }
 

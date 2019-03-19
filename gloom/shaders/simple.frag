@@ -15,7 +15,8 @@ const float AA = 2.0f;
 const float PI = 3.1415926535897932384626433832795;
 
 const vec3 underwater_color = vec3(0.0f, 0.0f, 0.10f);
-const vec3 sky_color = vec3(0.31f, 0.62f, 0.86f);
+const vec3 sunny_sky_color = vec3(0.31f, 0.62f, 0.86f);
+const vec3 rainy_sky_color = vec3(0.22f, 0.26f, 0.29f);
 const vec3 sphere_color = vec3(1.0f, 1.0f, 1.0f);
 
 const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
@@ -28,6 +29,7 @@ const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
 #define REFRACTION
 #define SHADOW
 // #define AO
+#define RAIN
 
 vec2 noise(vec3 p)
 {
@@ -317,16 +319,30 @@ vec4 shade_scene()
     float dist_sphere = trace_sphere(eye, ray_dir, MIN_DIST, MAX_DIST);
 
     if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
-        return sky_color;
+        return rainy_sky_color;
         return vec4(0.0f, 0.0f, 0.0f, 1.0f);
     }
 
+    #ifdef RAIN
+    // https://www.shadertoy.com/view/XdSGDc
+    vec2 q = gl_FragCoord.xy / window_size;
+    float f = pow(1, 0.45f) + 0.25f;
+    vec2 st = f * (q*vec2(1.5f, 0.05f) + vec2(-time*0.1 + q.y*0.5, time*0.12));
+    f = (texture(noise_texture, st*0.5, -99.0).x + texture(noise_texture, st*0.284, -99.0).y);
+    f = clamp(pow(abs(f)*0.5f, 29.0f)*140.0f, 0.00, q.y*0.4f + 0.5f);
+    vec3 brightness = vec3(0.25f);
+    vec4 rain = vec4(brightness*f, 1.0f);
+    #endif
+
+    vec4 col;
     if (dist_plane < dist_sphere) {
         vec3 p_plane = eye + dist_plane*ray_dir;
         vec3 n_plane = est_normal(p_plane);
 
         // Standard color of water.
-        vec4 col = vec4(phong_illumination(k_a, k_d, k_s, shininess, p_plane, eye, underwater_color, n_plane), 1.0f);
+        col = vec4(phong_illumination(k_a, k_d, k_s, shininess,
+                                      p_plane, eye, underwater_color,
+                                      n_plane), 1.0f);
 
         // Refraction.
         #ifdef REFRACTION
@@ -348,7 +364,7 @@ vec4 shade_scene()
         float fresnel = pow(1.0f-abs(dot(ray_dir, n_plane)), 2.0f);
         vec3 refl_dir = reflect(ray_dir, n_plane);
         float refl_dist_sphere = trace_sphere(p_plane, refl_dir, MIN_DIST, MAX_DIST);
-        vec4 reflection = vec4(sky_color, 1.0f);
+        vec4 reflection = vec4(rainy_sky_color, 1.0f);
         if (refl_dist_sphere < MAX_DIST - EPSILON) {
             vec3 refl_p_sphere = p_plane + refl_dist_sphere*refl_dir;
             vec3 refl_sphere_n = est_sphere_normal(refl_p_sphere, SPHERE_RADIUS);
@@ -358,14 +374,18 @@ vec4 shade_scene()
         }
         col = mix(col, reflection, fresnel);
         #endif
-
-        return col;
     } else {
         vec3 p_sphere = eye + dist_sphere*ray_dir;
-        return vec4(phong_illumination(k_a, k_d, k_s, shininess,
-                                       p_sphere, eye, sphere_color,
-                                       est_sphere_normal(p_sphere, SPHERE_RADIUS)), 1.0f);
+        col = vec4(phong_illumination(k_a, k_d, k_s, shininess,
+                                      p_sphere, eye, sphere_color,
+                                      est_sphere_normal(p_sphere, SPHERE_RADIUS)), 1.0f);
     }
+
+    #ifdef RAIN
+    col += rain;
+    #endif
+
+    return col;
 }
 
 void main()

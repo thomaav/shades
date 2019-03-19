@@ -16,7 +16,7 @@ const vec3 wave_color = vec3(0.35f, 0.74f, 0.85f);
 const vec3 ball_color = vec3(1.0f, 1.0f, 1.0f);
 
 #define SPHERE_RADIUS 0.45f
-#define sd_sphere_call (sd_sphere(sd_translate(point, vec3(0.0f, -0.5f, 0.0f)), SPHERE_RADIUS))
+#define sd_sphere_call (sd_sphere(sd_translate(point, vec3(0.0f, sin(time) * -1.0f, 0.0f)), SPHERE_RADIUS))
 
 float sd_plane(vec3 point)
 {
@@ -155,7 +155,7 @@ vec3 estimate_normal(vec3 p)
 vec3 estimate_sphere_normal(vec3 p, float r)
 {
     const float EPSILON = 0.001;
-    p = sd_translate(p, vec3(0.0f, -0.5f, 0.0f));
+    p = sd_translate(p, vec3(0.0f, sin(time) * -1.0f, 0.0f));
     return normalize(vec3(
         sd_sphere(vec3(p.x + EPSILON, p.y, p.z), r) - sd_sphere(vec3(p.x - EPSILON, p.y, p.z), r),
         sd_sphere(vec3(p.x, p.y + EPSILON, p.z), r) - sd_sphere(vec3(p.x, p.y - EPSILON, p.z), r),
@@ -228,7 +228,8 @@ vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,
 vec3 phong_illumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha,
                         vec3 p, vec3 eye, vec3 light_intensity, vec3 normal)
 {
-    float occlusion = ambient_occlusion(p, estimate_normal(p));
+    float occlusion = ambient_occlusion(p, normal);
+    occlusion = 1.0f;
     vec3 ambient_light = 0.3 * vec3(1.0f, 1.0f, 1.0f);
     vec3 tmp_color = k_a * ambient_light * occlusion;
     vec3 light_pos = vec3(10.0f, 8.0f, -10.0f);
@@ -275,9 +276,8 @@ vec4 shade_scene()
     if (dist_plane < dist_ball) {
         p = eye + dist_plane*dir;
         vec3 p_normal = estimate_normal(p);
-        vec3 sphere_normal = estimate_sphere_normal(p, SPHERE_RADIUS); // this is wrong you idiot
         float ndotdir = dot(dir, p_normal);
-        float fresnel = pow(1.0f-abs(dot(dir, p_normal)), 2.0f);
+        float fresnel = pow(1.0f-abs(dot(dir, p_normal)), 3.0f);
         vec3 ref_dir = reflect(dir, p_normal);
         float ref_dist_ball = trace_ball(p, ref_dir, MIN_DIST, MAX_DIST);
 
@@ -285,19 +285,21 @@ vec4 shade_scene()
         vec4 col = vec4(phong_illumination(k_a, k_d, k_s, shininess, p, eye, wave_color, p_normal), 1.0f);
 
         // Refraction.
-        // vec3 refracted_dir = normalize(dir + (-cos(1.33*acos(-ndotdir))-ndotdir)*p_normal);
-        // float refracted_dist_ball = trace_ball(p, refracted_dir, MIN_DIST, MAX_DIST);
-        // if (refracted_dist_ball < MAX_DIST - EPSILON) {
-        //     vec3 refracted_ball_p = p + refracted_dist_ball*refracted_dir;
-        //     vec4 refraction_color =
-        //         vec4(phong_illumination(k_a, k_d, k_s, shininess, refracted_ball_p, p, ball_color, sphere_normal), 1.0f);
-        //     col = mix(col, refraction_color, exp(-refracted_dist_ball));
-        // }
+        vec3 refracted_dir = normalize(dir + (-cos(1.10*acos(-ndotdir))-ndotdir)*p_normal);
+        float refracted_dist_ball = trace_ball(p, refracted_dir, MIN_DIST, MAX_DIST);
+        if (refracted_dist_ball < MAX_DIST - EPSILON) {
+            vec3 refracted_ball_p = p + refracted_dist_ball*refracted_dir;
+            vec3 sphere_normal = estimate_sphere_normal(refracted_ball_p, SPHERE_RADIUS);
+            vec4 refraction_color =
+                vec4(phong_illumination(k_a, k_d, k_s, shininess, refracted_ball_p, p, ball_color, sphere_normal), 1.0f);
+            col = mix(col, refraction_color, exp(-refracted_dist_ball));
+        }
 
         // Reflection.
         if (ref_dist_ball < MAX_DIST - EPSILON) {
             vec3 ball_p = p + ref_dist_ball*ref_dir;
-            vec4 reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess, ball_p, p, ball_color, p_normal), 1.0f);
+            vec3 refl_sphere_n = estimate_sphere_normal(ball_p, SPHERE_RADIUS);
+            vec4 reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess, ball_p, p, ball_color, refl_sphere_n), 1.0f);
             col = mix(col, reflection, fresnel);
         }
 

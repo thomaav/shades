@@ -23,10 +23,45 @@ const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
 #define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, sin(time) * -1.0f, 0.0f)))
 #define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, SPHERE_RADIUS))
 
-// #define REFLECTION
+#define REFLECTION
 #define REFRACTION
-#define SHADOW
+// #define SHADOW
 // #define AO
+
+vec2 noise(vec3 p)
+{
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+
+    // Cubic Hermine Curve (smoothstep).
+    f = f*f*(3.0-2.0*f);
+
+    vec2 uv = (i.xy + vec2(37.0, 17.0)*i.z);
+    vec4 rg = textureLod(noise_texture, (uv+f.xy+0.5)/256.0, 0.0);
+
+    return mix(rg.yw, rg.xz, f.z);
+}
+
+float sd_waves(vec3 p)
+{
+    float height = p.y;
+    p *= 0.2*vec3(1, 1, 1);
+
+    const int octaves = 5;
+    float f = 0.0;
+
+    p += time*vec3(0, 0.1, 0.1);
+    for (int i = 0; i < octaves; ++i) {
+        p = (p.yzx + p.zyx*vec3(1, -1, 1)) / sqrt(2.0);
+        f = f*2.0 + abs(noise(p).x - 0.5)*2.0;
+        p *= 2.0;
+    }
+
+    f /= exp2(float(octaves));
+    float turbulence = (0.5 - f)*1.0;
+
+    return height - turbulence;
+}
 
 float sd_plane(vec3 p)
 {
@@ -92,7 +127,7 @@ vec3 sd_rotate(vec3 p, float theta)
 
 float sd_scene(vec3 p)
 {
-    float plane = sd_plane(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
+    float plane = sd_waves(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
     float sphere = sd_sphere_call;
 
     return sd_union(plane, sphere);
@@ -105,7 +140,7 @@ float sd_scene_sphere(vec3 p)
 
 float sd_scene_plane(vec3 p)
 {
-    return sd_plane(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
+    return sd_waves(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
 }
 
 float trace_sphere(vec3 eye, vec3 dir, float start, float end)
@@ -153,7 +188,7 @@ vec3 ray_direction(float fov, vec2 size, vec2 fc)
 
 vec3 est_normal(vec3 p)
 {
-    const float EPSILON = 0.001;
+    const float EPSILON = 0.01*length(p);
     return normalize(vec3(
           sd_scene(vec3(p.x + EPSILON, p.y, p.z)) - sd_scene(vec3(p.x - EPSILON, p.y, p.z)),
           sd_scene(vec3(p.x, p.y + EPSILON, p.z)) - sd_scene(vec3(p.x, p.y - EPSILON, p.z)),
@@ -279,6 +314,7 @@ vec4 shade_scene()
 
     float dist_plane = trace_plane(eye, ray_dir, MIN_DIST, MAX_DIST);
     float dist_sphere = trace_sphere(eye, ray_dir, MIN_DIST, MAX_DIST);
+    // return vec4(dist_plane / 70, 0.0f, 0.0f, 1.0f);
 
     if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
         return vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -308,7 +344,7 @@ vec4 shade_scene()
 
         // Reflection.
         #ifdef REFLECTION
-        float fresnel = pow(1.0f-abs(dot(ray_dir, n_plane)), 3.0f);
+        float fresnel = pow(1.0f-abs(dot(ray_dir, n_plane)), 2.0f);
         vec3 refl_dir = reflect(ray_dir, n_plane);
         float refl_dist_sphere = trace_sphere(p_plane, refl_dir, MIN_DIST, MAX_DIST);
         if (refl_dist_sphere < MAX_DIST - EPSILON) {

@@ -14,7 +14,8 @@ const float EPSILON = 0.0005;
 const float AA = 2.0f;
 const float PI = 3.1415926535897932384626433832795;
 
-const vec3 wave_color = vec3(0.35f, 0.74f, 0.85f);
+const vec3 underwater_color = vec3(0.0f, 0.0f, 0.10f);
+const vec3 sky_color = vec3(0.31f, 0.62f, 0.86f);
 const vec3 sphere_color = vec3(1.0f, 1.0f, 1.0f);
 
 const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
@@ -25,7 +26,7 @@ const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
 
 #define REFLECTION
 #define REFRACTION
-// #define SHADOW
+#define SHADOW
 // #define AO
 
 vec2 noise(vec3 p)
@@ -314,9 +315,9 @@ vec4 shade_scene()
 
     float dist_plane = trace_plane(eye, ray_dir, MIN_DIST, MAX_DIST);
     float dist_sphere = trace_sphere(eye, ray_dir, MIN_DIST, MAX_DIST);
-    // return vec4(dist_plane / 70, 0.0f, 0.0f, 1.0f);
 
     if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
+        return sky_color;
         return vec4(0.0f, 0.0f, 0.0f, 1.0f);
     }
 
@@ -325,7 +326,7 @@ vec4 shade_scene()
         vec3 n_plane = est_normal(p_plane);
 
         // Standard color of water.
-        vec4 col = vec4(phong_illumination(k_a, k_d, k_s, shininess, p_plane, eye, wave_color, n_plane), 1.0f);
+        vec4 col = vec4(phong_illumination(k_a, k_d, k_s, shininess, p_plane, eye, underwater_color, n_plane), 1.0f);
 
         // Refraction.
         #ifdef REFRACTION
@@ -347,14 +348,15 @@ vec4 shade_scene()
         float fresnel = pow(1.0f-abs(dot(ray_dir, n_plane)), 2.0f);
         vec3 refl_dir = reflect(ray_dir, n_plane);
         float refl_dist_sphere = trace_sphere(p_plane, refl_dir, MIN_DIST, MAX_DIST);
+        vec4 reflection = vec4(sky_color, 1.0f);
         if (refl_dist_sphere < MAX_DIST - EPSILON) {
             vec3 refl_p_sphere = p_plane + refl_dist_sphere*refl_dir;
             vec3 refl_sphere_n = est_sphere_normal(refl_p_sphere, SPHERE_RADIUS);
-            vec4 reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess,
-                                                      refl_p_sphere, p_plane, sphere_color,
-                                                      refl_sphere_n), 1.0f);
-            col = mix(col, reflection, fresnel);
+            reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess,
+                                                 refl_p_sphere, p_plane, sphere_color,
+                                                 refl_sphere_n), 1.0f);
         }
+        col = mix(col, reflection, fresnel);
         #endif
 
         return col;

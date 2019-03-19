@@ -30,6 +30,12 @@ const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
 #define SHADOW
 // #define AO
 #define RAIN
+#define RAIN_SPLASH
+
+float random(vec2 st)
+{
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233)))*48301.231*sin(time));
+}
 
 vec2 noise(vec3 p)
 {
@@ -318,15 +324,13 @@ vec4 shade_scene()
     float dist_plane = trace_plane(eye, ray_dir, MIN_DIST, MAX_DIST);
     float dist_sphere = trace_sphere(eye, ray_dir, MIN_DIST, MAX_DIST);
 
-    if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
+    if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON)
         return rainy_sky_color;
-        return vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    }
 
     #ifdef RAIN
     // https://www.shadertoy.com/view/XdSGDc
     vec2 q = gl_FragCoord.xy / window_size;
-    float f = pow(1, 0.45f) + 0.25f;
+    float f = 5.0f;
     vec2 st = f * (q*vec2(1.5f, 0.05f) + vec2(-time*0.1 + q.y*0.5, time*0.12));
     f = (texture(noise_texture, st*0.5, -99.0).x + texture(noise_texture, st*0.284, -99.0).y);
     f = clamp(pow(abs(f)*0.5f, 29.0f)*140.0f, 0.00, q.y*0.4f + 0.5f);
@@ -373,6 +377,17 @@ vec4 shade_scene()
                                                  refl_sphere_n), 1.0f);
         }
         col = mix(col, reflection, fresnel);
+
+        #ifdef RAIN_SPLASH
+        vec2 q = (gl_FragCoord.xy / window_size)*200.0f;
+        vec2 i = floor(q);
+        vec2 f = fract(q);
+
+        float splash = random(i);
+        if (splash >= 0.999f)
+            col = mix(col, vec4(1.0f), 0.5f);
+        #endif
+
         #endif
     } else {
         vec3 p_sphere = eye + dist_sphere*ray_dir;

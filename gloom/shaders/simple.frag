@@ -325,7 +325,7 @@ vec4 shade_scene()
     float dist_sphere = trace_sphere(eye, ray_dir, MIN_DIST, MAX_DIST);
 
     if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON)
-        return rainy_sky_color;
+        return vec4(rainy_sky_color, 1.0f);
 
     #ifdef RAIN
     // https://www.shadertoy.com/view/XdSGDc
@@ -379,7 +379,7 @@ vec4 shade_scene()
         col = mix(col, reflection, fresnel);
 
         #ifdef RAIN_SPLASH
-        vec2 q = (gl_FragCoord.xy / window_size)*200.0f;
+        vec2 q = (gl_FragCoord.xy / window_size)*500.0f;
         vec2 i = floor(q);
         vec2 f = fract(q);
 

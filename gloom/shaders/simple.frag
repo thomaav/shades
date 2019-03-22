@@ -7,7 +7,7 @@ uniform layout(location=1) float time;
 
 uniform sampler2D noise_texture;
 
-const int MARCHSTEPS = 250;
+const int MARCHSTEPS = 400;
 const float MIN_DIST = 0.0f;
 const float MAX_DIST = 100.0f;
 const float EPSILON = 0.0005;
@@ -51,6 +51,20 @@ vec2 noise(vec3 p)
     vec4 rg = textureLod(noise_texture, (uv+f.xy+0.5)/256.0, 0.0);
 
     return mix(rg.yw, rg.xz, f.z);
+}
+
+float fbm(vec2 p)
+{
+    float v = 0.0, f = 1.0, a = 0.5;
+
+    for (int i = 0; i < 5; ++i) {
+        v += noise(vec3(p, 1.0f)*f).y*a;
+
+        f *= 2.0;
+        a *= 0.5;
+    }
+
+    return v;
 }
 
 float sd_waves(vec3 p)
@@ -346,7 +360,12 @@ vec4 shade_scene()
 
     if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
         #ifdef CLOUDS
-        ;
+        vec2 uv = q*2.0 - 1.0;
+
+        float p = fbm(uv + vec2(time / 10, 0.0));
+        p = 1.0 - abs(p*2.0 - 1.0);
+        vec3 cloud = pow(vec3(p), vec3(0.3)) - (uv.y + 3.0)*0.2;
+        col = vec4(cloud, 1.0f);
         #endif
 
         #ifdef RAIN

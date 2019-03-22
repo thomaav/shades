@@ -5,7 +5,8 @@ out vec4 color;
 uniform layout(location=0) vec2 window_size;
 uniform layout(location=1) float time;
 
-uniform sampler2D noise_texture;
+uniform layout(binding=0) sampler2D noise_texture;
+uniform layout(binding=1) sampler2D planet_texture;
 
 const int MARCHSTEPS = 400;
 const float MIN_DIST = 0.0f;
@@ -17,12 +18,13 @@ const float PI = 3.1415926535897932384626433832795;
 const vec3 underwater_color = vec3(0.0f, 0.0f, 0.10f);
 const vec3 sunny_sky_color = vec3(0.31f, 0.62f, 0.86f);
 const vec3 rainy_sky_color = vec3(0.22f, 0.26f, 0.29f);
-const vec3 sphere_color = vec3(1.0f, 1.0f, 1.0f);
+const vec3 sphere_color = vec3(0.2f, 0.3f, 0.4f);
 
-const vec3 scene_eye = vec3(3.0f, 1.0f, 10.0f);
+const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 
 #define SPHERE_RADIUS 0.45f
-#define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, sin(time) * -1.0f, 0.0f)))
+#define SPHERE_Y_TRANSLATION (sin (time) * - 1.0f)
+#define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, SPHERE_Y_TRANSLATION, 0.0f)))
 #define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, SPHERE_RADIUS))
 
 #define REFLECTION
@@ -33,6 +35,7 @@ const vec3 scene_eye = vec3(3.0f, 1.0f, 10.0f);
 #define RAIN_SPLASH
 #define WATER_FOAM
 #define CLOUDS
+#define PLANET
 
 float random(vec2 st)
 {
@@ -384,7 +387,6 @@ vec4 shade_scene()
                                       p_plane, eye, underwater_color,
                                       n_plane), 1.0f);
 
-        // Refraction.
         #ifdef REFRACTION
         float raydotn = dot(ray_dir, n_plane);
         vec3 refr_ray = normalize(ray_dir + (-cos(1.10*acos(-raydotn))-raydotn)*n_plane);
@@ -399,7 +401,6 @@ vec4 shade_scene()
         }
         #endif
 
-        // Reflection.
         #ifdef REFLECTION
         float fresnel = pow(1.0f-abs(dot(ray_dir, n_plane)), 2.0f);
         vec3 refl_dir = reflect(ray_dir, n_plane);
@@ -426,9 +427,22 @@ vec4 shade_scene()
 
         #endif
     } else {
+        vec3 orb_color = sphere_color;
         vec3 p_sphere = eye + dist_sphere*ray_dir;
+
+        #ifdef PLANET
+        vec2 uv;
+        uv.x = atan(p_sphere.x, p_sphere.z)/6.2831 - time*0.05;
+        uv.y = (acos(p_sphere.y + SPHERE_Y_TRANSLATION*-1.0f)/3.1416)*0.5;
+
+        vec3 planet_texture = texture(planet_texture, 0.5*uv.yx).xyz;
+        orb_color = mix(orb_color,
+            (vec3(0.2, 0.5, 0.1)*0.55 + 0.45*planet_texture)*0.44,
+            smoothstep(0.45, 0.5, planet_texture.x));
+        #endif
+
         col = vec4(phong_illumination(k_a, k_d, k_s, shininess,
-                                      p_sphere, eye, sphere_color,
+                                      p_sphere, eye, orb_color,
                                       est_sphere_normal(p_sphere, SPHERE_RADIUS)), 1.0f);
     }
 

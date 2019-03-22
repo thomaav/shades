@@ -362,10 +362,10 @@ vec4 shade_scene()
         #ifdef CLOUDS
         vec2 uv = q*2.0 - 1.0;
 
-        float p = fbm(uv + vec2(time / 10, 0.0));
+        float p = fbm(uv - vec2(time / 10, 0.0));
         p = 1.0 - abs(p*2.0 - 1.0);
         vec3 cloud = pow(vec3(p), vec3(0.3)) - (uv.y + 3.0)*0.2;
-        col = vec4(cloud, 1.0f);
+        col = mix(col, vec4(cloud, 1.0f), 0.5f);
         #endif
 
         #ifdef RAIN

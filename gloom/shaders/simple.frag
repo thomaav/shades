@@ -19,7 +19,7 @@ const vec3 sunny_sky_color = vec3(0.31f, 0.62f, 0.86f);
 const vec3 rainy_sky_color = vec3(0.22f, 0.26f, 0.29f);
 const vec3 sphere_color = vec3(1.0f, 1.0f, 1.0f);
 
-const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
+const vec3 scene_eye = vec3(3.0f, 1.0f, 10.0f);
 
 #define SPHERE_RADIUS 0.45f
 #define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, sin(time) * -1.0f, 0.0f)))
@@ -31,6 +31,8 @@ const vec3 scene_eye = vec3(3.0f, 3.0f, 10.0f);
 // #define AO
 #define RAIN
 #define RAIN_SPLASH
+#define WATER_FOAM
+#define CLOUDS
 
 float random(vec2 st)
 {
@@ -70,6 +72,11 @@ float sd_waves(vec3 p)
     float turbulence = (0.5 - f)*1.0;
 
     return height - turbulence;
+}
+
+float sd_waves_foam(vec3 p)
+{
+    return 0.0f;
 }
 
 float sd_plane(vec3 p)
@@ -324,8 +331,7 @@ vec4 shade_scene()
     float dist_plane = trace_plane(eye, ray_dir, MIN_DIST, MAX_DIST);
     float dist_sphere = trace_sphere(eye, ray_dir, MIN_DIST, MAX_DIST);
 
-    if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON)
-        return vec4(rainy_sky_color, 1.0f);
+    vec4 col = vec4(rainy_sky_color, 1.0f);
 
     #ifdef RAIN
     // https://www.shadertoy.com/view/XdSGDc
@@ -338,7 +344,18 @@ vec4 shade_scene()
     vec4 rain = vec4(brightness*f, 1.0f);
     #endif
 
-    vec4 col;
+    if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
+        #ifdef CLOUDS
+        ;
+        #endif
+
+        #ifdef RAIN
+        col += rain;
+        #endif
+
+        return col;
+    }
+
     if (dist_plane < dist_sphere) {
         vec3 p_plane = eye + dist_plane*ray_dir;
         vec3 n_plane = est_normal(p_plane);
@@ -398,6 +415,10 @@ vec4 shade_scene()
 
     #ifdef RAIN
     col += rain;
+    #endif
+
+    #ifdef WATER_FOAM
+    ;
     #endif
 
     return col;

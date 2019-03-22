@@ -37,9 +37,31 @@ const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define CLOUDS
 #define PLANET
 
+// https://thebookofshaders.com/13/
 float random(vec2 st)
 {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233)))*48301.231*sin(time));
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233)))*48301.231*sin(time/3));
+}
+
+// https://thebookofshaders.com/13/
+// Standard 2D noise function using Cubic Hermine
+float noise(vec2 st)
+{
+    vec2 i = floor(st);
+    vec2 f = floor(st);
+
+    // Create four corners of a 2D tile from random.
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+
+    // Cubic Hermine Curve (smoothstep).
+    f = f*f*(3.0-2.0*f);
+
+    return mix(a, b, f.x) +
+        (c - a)*f.y*(1.0 - f.x) +
+        (d - b)*f.x*f.y;
 }
 
 vec2 noise(vec3 p)
@@ -62,6 +84,7 @@ float fbm(vec2 p)
 
     for (int i = 0; i < 5; ++i) {
         v += noise(vec3(p, 1.0f)*f).y*a;
+        // v += noise(p)*a;
 
         f *= 2.0;
         a *= 0.5;
@@ -432,13 +455,21 @@ vec4 shade_scene()
 
         #ifdef PLANET
         vec2 uv;
-        uv.x = atan(p_sphere.x, p_sphere.z)/6.2831 - time*0.05;
+        uv.x = atan(p_sphere.x, p_sphere.z)/(6.2831*2.0) - time*0.15;
         uv.y = (acos(p_sphere.y + SPHERE_Y_TRANSLATION*-1.0f)/3.1416)*0.5;
 
-        vec3 planet_texture = texture(planet_texture, 0.5*uv.yx).xyz;
+        vec3 planet_color = texture(planet_texture, 0.5*uv.yx).xyz;
+
+        // Mix in ground level of the planet.
         orb_color = mix(orb_color,
-            (vec3(0.2, 0.5, 0.1)*0.55 + 0.45*planet_texture)*0.44,
-            smoothstep(0.45, 0.5, planet_texture.x));
+                        ((vec3(0.2, 0.5, 0.1)*0.55 +
+                          0.45*planet_color +
+                          0.5*texture(planet_texture, 15.5*uv.yx).xyz)*0.4),
+                        smoothstep(0.45, 0.5, planet_color.x));
+
+        // Mix in the clouds of the planet.
+        vec3 cloud = texture(planet_texture, 2.0*uv).xxx;
+        orb_color = mix(orb_color, vec3(0.9), 0.75*smoothstep(0.55, 0.8, cloud.x));
         #endif
 
         col = vec4(phong_illumination(k_a, k_d, k_s, shininess,

@@ -92,8 +92,6 @@ void playWAV(const char *fp, std::future<bool> &&stop)
     while (true) {
         alGetSourcei(alSource, AL_SAMPLE_OFFSET, &offset);
         bass_amplitude = fft_bass_amplitude(left_channel_data + offset, 4410);
-        std::cout << bass_amplitude << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     // Wait until the main thread tells us to stop playing.

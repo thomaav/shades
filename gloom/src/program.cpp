@@ -104,6 +104,7 @@ void runProgram(GLFWwindow* window)
         // Pass required uniforms.
         glUniform2f(0, windowWidth, windowHeight);
         glUniform1f(1, (float) glfwGetTime());
+        glUniform1f(2, bass_amplitude);
 
         // Make sure textures are activated.
         glActiveTexture(GL_TEXTURE0);

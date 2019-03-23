@@ -4,6 +4,7 @@ out vec4 color;
 
 uniform layout(location=0) vec2 window_size;
 uniform layout(location=1) float time;
+uniform layout(location=2) float bass_amplitude;
 
 uniform layout(binding=0) sampler2D noise_texture;
 uniform layout(binding=1) sampler2D planet_texture;
@@ -22,10 +23,10 @@ const vec3 sphere_color = vec3(0.2f, 0.3f, 0.4f);
 
 const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 
-#define SPHERE_RADIUS 0.45f
-#define SPHERE_Y_TRANSLATION (sin (time) * - 1.0f)
+// #define SPHERE_Y_TRANSLATION (sin (time) * - 1.0f)
+#define SPHERE_Y_TRANSLATION 1.0f
 #define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, SPHERE_Y_TRANSLATION, 0.0f)))
-#define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, SPHERE_RADIUS))
+#define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, sphere_radius()))
 
 #define REFLECTION
 #define REFRACTION
@@ -127,6 +128,23 @@ float sd_plane(vec3 p)
         return p.y;
 
     return p.y + 0.03*(dist)*cos(dist*5.0f-time*5.0f);
+}
+
+float sphere_radius()
+{
+    float min_amplitude = 60.0f;
+    float max_amplitude = 120.0f;
+    float range = max_amplitude - min_amplitude;
+
+    // https://stackoverflow.com/questions/10364575/normalization-in-variable-range-x-y-in-matlab
+    float min_scale = 0.0f;
+    float max_scale = 0.2f;
+    float range2 = max_scale - min_scale;
+
+    float normalized_bass = (bass_amplitude - min_amplitude) / range;
+    normalized_bass = (normalized_bass * range2) + min_scale;
+
+    return 0.45 + normalized_bass;
 }
 
 float sd_sphere(vec3 p, float r)
@@ -416,7 +434,7 @@ vec4 shade_scene()
         float refr_dist_sphere = trace_sphere(p_plane, refr_ray, MIN_DIST, MAX_DIST);
         if (refr_dist_sphere < MAX_DIST - EPSILON) {
             vec3 refr_p_sphere = p_plane + refr_dist_sphere*refr_ray;
-            vec3 sphere_normal = est_sphere_normal(refr_p_sphere, SPHERE_RADIUS);
+            vec3 sphere_normal = est_sphere_normal(refr_p_sphere, sphere_radius());
             vec4 refr_color = vec4(phong_illumination(k_a, k_d, k_s, shininess,
                                                       refr_p_sphere, p_plane, sphere_color,
                                                       sphere_normal), 1.0f);
@@ -431,7 +449,7 @@ vec4 shade_scene()
         vec4 reflection = vec4(rainy_sky_color, 1.0f);
         if (refl_dist_sphere < MAX_DIST - EPSILON) {
             vec3 refl_p_sphere = p_plane + refl_dist_sphere*refl_dir;
-            vec3 refl_sphere_n = est_sphere_normal(refl_p_sphere, SPHERE_RADIUS);
+            vec3 refl_sphere_n = est_sphere_normal(refl_p_sphere, sphere_radius());
             reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess,
                                                  refl_p_sphere, p_plane, sphere_color,
                                                  refl_sphere_n), 1.0f);
@@ -474,7 +492,7 @@ vec4 shade_scene()
 
         col = vec4(phong_illumination(k_a, k_d, k_s, shininess,
                                       p_sphere, eye, orb_color,
-                                      est_sphere_normal(p_sphere, SPHERE_RADIUS)), 1.0f);
+                                      est_sphere_normal(p_sphere, sphere_radius())), 1.0f);
     }
 
     #ifdef RAIN

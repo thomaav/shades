@@ -6,7 +6,7 @@
 constexpr double alpha = 0.54;
 constexpr double beta  = 0.46;
 
-constexpr int fft_size = 4096;
+constexpr int fft_size = 1024;
 constexpr int num_bins = fft_size / 2;
 constexpr int step_size = fft_size / 2; // 50% window overlap
 

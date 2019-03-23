@@ -25,7 +25,7 @@ double bin_to_frequency(double bin, double sample_rate, double frame_size)
 double fft_bass_amplitude(short *samples, size_t nsamples)
 {
     double bass_amplitude = 0;
-    int bass_bins = 5;
+    int bass_bins = 8;
 
     double *in;
     fftw_complex *out;

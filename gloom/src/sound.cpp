@@ -8,6 +8,8 @@
 #include <chrono>
 #include <thread>
 
+float bass_amplitude = 60.0f;
+
 #include <string.h>
 void print_devices()
 {
@@ -84,11 +86,14 @@ void playWAV(const char *fp, std::future<bool> &&stop)
     // Play some sound.
     alSourcePlay(alSource);
 
-    // The format is 4355, which is STEREO16, i.e. 2 channels 16 bits
-    // per sample (shorts).
-    for (size_t i = 0; i < 10000; ++i) {
-        std::cout << fft_bass_amplitude(left_channel_data + i*11025, 11025) << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    // Use where we are currently positioned within the music to
+    // calculate the FFT.
+    ALint offset;
+    while (true) {
+        alGetSourcei(alSource, AL_SAMPLE_OFFSET, &offset);
+        bass_amplitude = fft_bass_amplitude(left_channel_data + offset, 4410);
+        std::cout << bass_amplitude << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     // Wait until the main thread tells us to stop playing.

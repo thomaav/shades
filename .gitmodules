@@ -14,3 +14,9 @@
 	path = gloom/vendor/stb
 	url = https://github.com/nothings/stb.git
 	branch = master
+[submodule "gloom/vendor/openal-soft"]
+	path = gloom/vendor/openal-soft
+	url = https://github.com/kcat/openal-soft
+[submodule "gloom/vendor/freealut"]
+	path = gloom/vendor/freealut
+	url = https://github.com/vancegroup/freealut

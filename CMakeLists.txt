@@ -29,13 +29,25 @@ option (GLFW_BUILD_TESTS OFF)
 add_subdirectory (gloom/vendor/glfw)
 
 #
+# OpenAL options
+#
+add_subdirectory (gloom/vendor/openal-soft)
+
+#
+# freealut options
+#
+add_subdirectory (gloom/vendor/freealut)
+
+#
 # Set include paths
 #
 include_directories (gloom/src/
                      gloom/vendor/glad/include/
                      gloom/vendor/glfw/include/
                      gloom/vendor/glm/
-                     gloom/vendor/stb/)
+                     gloom/vendor/stb/
+                     gloom/vendor/opensoft-al/include/
+                     gloom/vendor/freealut/include/)
 
 #
 # Add files
@@ -75,6 +87,8 @@ add_executable (${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS}
 target_link_libraries (${PROJECT_NAME}
                        glfw
                        ${GLFW_LIBRARIES}
-                       ${GLAD_LIBRARIES})
+                       ${GLAD_LIBRARIES}
+                       openal
+                       alut)
 set_target_properties (${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PROJECT_NAME})

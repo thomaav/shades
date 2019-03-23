@@ -35,7 +35,7 @@ void playWAV(const char *fp, std::future<bool> &&stop)
     ALCcontext *context;
     ALCdevice *device;
 
-    if (!(device = alcOpenDevice("MOMENTUM M2 IEBT"))) {
+    if (!(device = alcOpenDevice(DEFAULT))) {
         std::cout << "Could not open default audio device" << std::endl;
         exit(1);
     }

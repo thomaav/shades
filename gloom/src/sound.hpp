@@ -1,3 +1,5 @@
 #pragma once
 
-void playWAV(const char *fp);
+#include <future>
+
+void playWAV(const char *fp, std::future<bool> &&stop);

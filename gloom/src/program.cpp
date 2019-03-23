@@ -1,13 +1,21 @@
 #include "program.hpp"
+#include "sound.hpp"
 #include "gloom/gloom.hpp"
 #include "gloom/shader.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "vendor/stb_image.h"
 
+#include <thread>
+#include <future>
+#include <utility>
 
 void runProgram(GLFWwindow* window)
 {
+    std::promise<bool> stop_music;
+    std::future<bool> music_stopped = stop_music.get_future();
+    std::thread music_thread(playWAV, "../gloom/audio/danger.wav", std::move(music_stopped));
+
     // Enable depth (Z) buffer (accept "closest" fragment)
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -114,6 +122,9 @@ void runProgram(GLFWwindow* window)
         // Flip buffers
         glfwSwapBuffers(window);
     }
+
+    stop_music.set_value(true);
+    music_thread.join();
 }
 
 

@@ -1,12 +1,12 @@
+#include "sound.hpp"
+
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/alut.h>
 #include <iostream>
 
-#include "sound.hpp"
-
 // http://www.david-amador.com/2011/06/playing-sound-using-openal/
-void playWAV(const char *fp)
+void playWAV(const char *fp, std::future<bool> &&stop)
 {
     // We need to initialize an OpenAL context to use to play
     // sound. This is very similar to what we do with OpenGL.
@@ -53,12 +53,8 @@ void playWAV(const char *fp)
     // Play some sound.
     alSourcePlay(alSource);
 
-    // Check if we are still playing.
-    ALenum state;
-    while (true) {
-        alGetSourcei(alSource, AL_SOURCE_STATE, &state);
-        if (state != AL_PLAYING) break;
-    }
+    // Wait until the main thread tells us to stop playing.
+    stop.get();
 
     // Clean up.
     alDeleteSources(1, &alSource);

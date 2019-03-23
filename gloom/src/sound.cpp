@@ -1,9 +1,29 @@
 #include "sound.hpp"
+#include "fft.hpp"
 
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/alut.h>
 #include <iostream>
+#include <chrono>
+#include <thread>
+
+#include <string.h>
+void print_devices()
+{
+    ALCchar *devices = (ALCchar *) alcGetString(NULL, ALC_ALL_DEVICES_SPECIFIER);
+    ALCchar *next = devices + 1;
+    ALCchar *device = devices;
+    size_t len = 0;
+
+    std::cout << "Devices:" << std::endl;
+	while (device && *device != '\0' && next && *next != '\0') {
+        std::cout << "  " << device << std::endl;
+		len = strlen(device);
+		device += (len + 1);
+		next += (len + 2);
+	}
+}
 
 // http://www.david-amador.com/2011/06/playing-sound-using-openal/
 void playWAV(const char *fp, std::future<bool> &&stop)
@@ -13,7 +33,7 @@ void playWAV(const char *fp, std::future<bool> &&stop)
     ALCcontext *context;
     ALCdevice *device;
 
-    if (!(device = alcOpenDevice(NULL))) {
+    if (!(device = alcOpenDevice("MOMENTUM M2 IEBT"))) {
         std::cout << "Could not open default audio device" << std::endl;
         exit(1);
     }
@@ -48,15 +68,37 @@ void playWAV(const char *fp, std::future<bool> &&stop)
     alBufferData(alSampleSet, alFormatBuffer, alBuffer, alBufferLen, alFreqBuffer);
     alSourcei(alSource, AL_BUFFER, alSampleSet);
 
-    alutUnloadWAV(alFormatBuffer, alBuffer, alBufferLen, alFreqBuffer);
+    // alBuffer contains STEREO16, so convert that to left and right
+    // channels.
+    short *left_channel_data = new short[2*alBufferLen/2];
+    short *right_channel_data = new short[2*alBufferLen/2];
+    long i_right = 0; long i_left = 0;
+
+    for (long i = 0; i < alBufferLen/2; ++i) {
+        if (i % 2 == 0)
+            left_channel_data[i_left++] = ((short *) alBuffer)[i];
+        else
+            right_channel_data[i_right++] = ((short *) alBuffer)[i];
+    }
 
     // Play some sound.
     alSourcePlay(alSource);
+
+    // The format is 4355, which is STEREO16, i.e. 2 channels 16 bits
+    // per sample (shorts).
+    for (size_t i = 0; i < 10000; ++i) {
+        std::cout << fft_bass_amplitude(left_channel_data + i*11025, 11025) << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    }
 
     // Wait until the main thread tells us to stop playing.
     stop.get();
 
     // Clean up.
+    delete[] left_channel_data;
+    delete[] right_channel_data;
+    alutUnloadWAV(alFormatBuffer, alBuffer, alBufferLen, alFreqBuffer);
+
     alDeleteSources(1, &alSource);
     alDeleteBuffers(1, &alSampleSet);
     alcDestroyContext(context);

@@ -1,5 +1,6 @@
 #include "program.hpp"
 #include "sound.hpp"
+#include "fft.hpp"
 #include "gloom/gloom.hpp"
 #include "gloom/shader.hpp"
 

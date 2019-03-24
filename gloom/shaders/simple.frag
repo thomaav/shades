@@ -21,6 +21,14 @@ const vec3 sunny_sky_color = vec3(0.31f, 0.62f, 0.86f);
 const vec3 rainy_sky_color = vec3(0.22f, 0.26f, 0.29f);
 const vec3 sphere_color = vec3(0.2f, 0.3f, 0.4f);
 
+const float cloud_diffusion = 0.3f;
+const float cloud_darkness = 0.2;
+const float cloud_blend = 0.4f;
+
+const float weather_strength = 0.15f;
+const float waves_height = 1.0f;
+const int waves_precision = 5;
+
 const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 
 // #define SPHERE_Y_TRANSLATION (sin (time) * - 1.0f)
@@ -38,14 +46,14 @@ const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define CLOUDS
 #define PLANET
 
-// https://thebookofshaders.com/13/
+// https://thebookofshaders.com/13/.
 float random(vec2 st)
 {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233)))*48301.231*sin(time/3));
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) *48301.231*sin(time/3));
 }
 
-// https://thebookofshaders.com/13/
-// Standard 2D noise function using Cubic Hermine
+// https://thebookofshaders.com/13/.
+// Standard 2D noise function using Cubic Hermine.
 float noise(vec2 st)
 {
     vec2 i = floor(st);
@@ -65,6 +73,9 @@ float noise(vec2 st)
         (d - b)*f.x*f.y;
 }
 
+// https://www.shadertoy.com/view/XdsGDB for an introduction to water.
+// Another noise function that is used to generate the water with a
+// Cubic Hermine Curve.
 vec2 noise(vec3 p)
 {
     vec3 i = floor(p);
@@ -79,42 +90,52 @@ vec2 noise(vec3 p)
     return mix(rg.yw, rg.xz, f.z);
 }
 
+// https://thebookofshaders.com/13/.
+// Completely standard Fractal Brownian Motion.
 float fbm(vec2 p)
 {
-    float v = 0.0, f = 1.0, a = 0.5;
+    const int octaves = 5;
+    float v = 0.0, a = 0.5;
 
-    for (int i = 0; i < 5; ++i) {
-        v += noise(vec3(p, 1.0f)*f).y*a;
-        // v += noise(p)*a;
+    for (int i = 0; i < octaves; ++i) {
+        v += noise(vec3(p, 1.0f)).y*a;
 
-        f *= 2.0;
+        p *= 2.0;
         a *= 0.5;
     }
 
     return v;
 }
 
+// See https://www.shadertoy.com/view/XdsGDB or
+// https://www.shadertoy.com/view/Ms2SD1 for how octaves are used to
+// create realistic water maps, much in the same vein as FBM. IQ also
+// explains the method (animated FBM with something like a Perlin
+// noise function) in
+// https://iquilezles.org/www/articles/simplewater/simplewater.htm.
 float sd_waves(vec3 p)
 {
-    float height = p.y;
-    p *= 0.2*vec3(1, 1, 1);
+    float plane_height = p.y;
+    p *= vec3(0.2);
 
-    const int octaves = 5;
     float f = 0.0;
 
-    p += time*vec3(0, 0.1, 0.1);
-    for (int i = 0; i < octaves; ++i) {
+    // The actual FBM.
+    p += time*vec3(0, weather_strength, weather_strength);
+    for (int i = 0; i < waves_precision; ++i) {
         p = (p.yzx + p.zyx*vec3(1, -1, 1)) / sqrt(2.0);
         f = f*2.0 + abs(noise(p).x - 0.5)*2.0;
         p *= 2.0;
     }
 
-    f /= exp2(float(octaves));
-    float turbulence = (0.5 - f)*1.0;
+    f /= exp2(float(waves_precision));
+    float turbulence = (0.5 - f)*waves_height;
 
-    return height - turbulence;
+    return plane_height - turbulence;
 }
 
+// Meant for calculating the crests/foam on the wave as they crash
+// (well, not really _crash_, a bit more random than that).
 float sd_waves_foam(vec3 p)
 {
     return 0.0f;
@@ -130,6 +151,8 @@ float sd_plane(vec3 p)
     return p.y + 0.03*(dist)*cos(dist*5.0f-time*5.0f);
 }
 
+// Calculate what the sphere of the radius should be, given a bass
+// amplitude output from an FFT.
 float sphere_radius()
 {
     float min_amplitude = 60.0f;
@@ -168,6 +191,7 @@ float sd_union(float sd_a, float sd_b)
     return min(sd_a, sd_b);
 }
 
+// https://www.iquilezles.org/www/articles/smin/smin.htm. Gorgeous.
 float sd_smooth_union(float sda, float sdb, float k)
 {
     float h = clamp(0.5f + 0.5f*(sdb-sda)/k, 0.0f, 1.0f);
@@ -270,6 +294,9 @@ vec3 est_normal(vec3 p)
     ));
 }
 
+// We need an estimation for the sphere in particular for when we are
+// doing transparent tracing (i.e. refraction in the water, otherwise
+// we just get the normal of the water plane).
 vec3 est_sphere_normal(vec3 p, float r)
 {
     const float EPSILON = 0.001;
@@ -404,12 +431,16 @@ vec4 shade_scene()
 
     if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
         #ifdef CLOUDS
+        // https://www.shadertoy.com/view/Xds3Rj for the inspiration
+        // for the clouds, changed to use our FBM and noise
+        // functions. Clouds are explained in detail at
+        // https://thebookofshaders.com/13/.
         vec2 uv = q*2.0 - 1.0;
 
-        float p = fbm(uv - vec2(time / 10, 0.0));
-        p = 1.0 - abs(p*2.0 - 1.0);
-        vec3 cloud = pow(vec3(p), vec3(0.3)) - (uv.y + 3.0)*0.2;
-        col = mix(col, vec4(cloud, 1.0f), 0.5f);
+        float cloud_fbm = fbm(uv - vec2(time / 10, 0.0));
+        cloud_fbm = 1.0 - abs(cloud_fbm*2.0 - 1.0);
+        vec3 cloud = pow(vec3(cloud_fbm), vec3(cloud_diffusion)) - (uv.y + 3.0)*cloud_darkness;
+        col = mix(col, vec4(cloud, 1.0f), cloud_blend);
         #endif
 
         #ifdef RAIN

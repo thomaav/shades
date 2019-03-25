@@ -39,6 +39,25 @@ add_subdirectory (gloom/vendor/openal-soft)
 add_subdirectory (gloom/vendor/freealut)
 
 #
+# fftw3
+#
+include(ExternalProject)
+ExternalProject_Add(
+	project_fftw
+	# GIT_REPOSITORY https://github.com/FFTW/fftw3
+	URL http://www.fftw.org/fftw-3.3.8.tar.gz
+	PREFIX ${CMAKE_CURRENT_BINARY_DIR}/gloom/vendor/fftw
+	CONFIGURE_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gloom/vendor/fftw/src/project_fftw/configure
+      --prefix=${CMAKE_CURRENT_BINARY_DIR}/gloom/vendor/fftw/install
+	INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/gloom/vendor/fftw/install
+)
+
+add_library(fftw STATIC IMPORTED)
+set(lib_fftw_name ${CMAKE_STATIC_LIBRARY_PREFIX}fftw3${CMAKE_STATIC_LIBRARY_SUFFIX})
+set_target_properties(fftw PROPERTIES IMPORTED_LOCATION
+  ${CMAKE_CURRENT_BINARY_DIR}/gloom/vendor/fftw/install/lib/${lib_fftw_name})
+
+#
 # Set include paths
 #
 include_directories (gloom/src/
@@ -47,7 +66,8 @@ include_directories (gloom/src/
                      gloom/vendor/glm/
                      gloom/vendor/stb/
                      gloom/vendor/opensoft-al/include/
-                     gloom/vendor/freealut/include/)
+                     gloom/vendor/freealut/include/
+		     ${CMAKE_CURRENT_BINARY_DIR}/gloom/vendor/fftw/install/include/)
 
 #
 # Add files
@@ -84,12 +104,13 @@ add_definitions (-DGLFW_INCLUDE_NONE
 add_executable (${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS}
                                 ${PROJECT_SHADERS} ${PROJECT_CONFIGS}
                                 ${VENDORS_SOURCES})
+add_dependencies(shades project_fftw)
 target_link_libraries (${PROJECT_NAME}
                        glfw
                        ${GLFW_LIBRARIES}
                        ${GLAD_LIBRARIES}
                        openal
                        alut
-                       fftw3)
+                       fftw)
 set_target_properties (${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PROJECT_NAME})

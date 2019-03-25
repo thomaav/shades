@@ -21,7 +21,8 @@ const vec3 sunny_sky_color = vec3(0.31f, 0.62f, 0.86f);
 const vec3 rainy_sky_color = vec3(0.22f, 0.26f, 0.29f);
 const vec3 sphere_color = vec3(0.2f, 0.3f, 0.4f);
 
-const float cloud_diffusion = 0.3f;
+float lightning_coeff = 0.0f;
+float cloud_diffusion = 0.3f;
 const float cloud_darkness = 0.2;
 const float cloud_blend = 0.4f;
 
@@ -59,7 +60,13 @@ float normalize_range(float f_min, float f_max, float t_min, float t_max, float 
     return normalized_x;
 }
 
-// https://thebookofshaders.com/13/.
+// https://thebookofshaders.com/10/.
+float random(float x)
+{
+    return fract(21654.6512 * sin(385.51 * x));
+}
+
+// https://thebookofshaders.com/10/.
 float random(vec2 st)
 {
     return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) *48301.231*sin(time/3));
@@ -422,12 +429,24 @@ vec4 shade_scene()
     #ifdef RAIN
     // https://www.shadertoy.com/view/XdSGDc
     vec2 q = gl_FragCoord.xy / window_size;
-    float f = 5.0f;
+    float f = 10.0f;
     vec2 st = f * (q*vec2(1.5f, 0.05f) + vec2(-time*0.1 + q.y*0.5, time*0.12));
     f = (texture(noise_texture, st*0.5, -99.0).x + texture(noise_texture, st*0.284, -99.0).y);
     f = clamp(pow(abs(f)*0.5f, 29.0f)*140.0f, 0.00, q.y*0.4f + 0.5f);
     vec3 brightness = vec3(0.25f);
     vec4 rain = vec4(brightness*f, 1.0f);
+    #endif
+
+    #ifdef LIGHTNING
+    // https://www.shadertoy.com/view/Xds3Rj
+    float lightning_seed = random(vec2(sqrt(1.0), floor(time + (1.0 / 10.0)) * 1.0));
+    if (lightning_seed >= 0.98) {
+        cloud_diffusion = 0.7;
+        lightning_coeff = 3.0f;
+    } else {
+        cloud_diffusion = 0.3;
+        lightning_coeff = 0.0f;
+    }
     #endif
 
     if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
@@ -443,10 +462,9 @@ vec4 shade_scene()
         vec3 cloud = pow(vec3(cloud_fbm), vec3(cloud_diffusion)) - (uv.y + 3.0)*cloud_darkness;
 
         #ifdef LIGHTNING
-        float lightning_coeff = normalize_range(60.0f, 120.0f, 0.0f, 2.0f, bass_amplitude);
-        // cloud += vec3(1.0f) * (sin(time*3.0)*2.0 + 1.0)*pow(length(cloud), 2);
         cloud += vec3(1.0f) * lightning_coeff*pow(length(cloud), 2);
         #endif
+
         col = mix(col, vec4(cloud, 1.0f), cloud_blend);
         #endif
 
@@ -550,10 +568,10 @@ void main()
     vec4 scene_col = shade_scene();
 
     #ifdef LIGHTNING
-    // vec4 lightning = vec4(0.0f);
-    // if (bass_amplitude > 110.0f)
-    //     lightning = vec4(0.2f);
-    // scene_col += lightning;
+    vec4 lightning = vec4(0.0f);
+    if (bass_amplitude > 110.0f)
+        lightning = vec4(0.2f);
+    scene_col += vec4(0.05f) * lightning_coeff;
     #endif
 
     color = scene_col;

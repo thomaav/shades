@@ -67,13 +67,13 @@ GLFWwindow* initialise()
 }
 
 
-int main(int argc, char* argb[])
+int main(int argc, char* argv[])
 {
     // Initialise window using GLFW
     GLFWwindow* window = initialise();
 
     // Run an OpenGL application using this window
-    runProgram(window);
+    runProgram(window, argc, argv);
 
     // Terminate GLFW (no need to call glfwDestroyWindow)
     glfwTerminate();

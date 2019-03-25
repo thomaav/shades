@@ -8,6 +8,7 @@
 #include <chrono>
 #include <thread>
 
+bool enable_audio = true;
 float bass_amplitude = 60.0f;
 
 #include <string.h>
@@ -84,7 +85,10 @@ void playWAV(const char *fp, std::future<bool> &&stop)
     }
 
     // Play some sound.
-    alSourcePlay(alSource);
+    if (enable_audio) {
+        alSourcef(alSource, AL_GAIN, 0.1f);
+        alSourcePlay(alSource);
+    }
 
     // Use where we are currently positioned within the music to
     // calculate the FFT. The use of a future here is complete abuse

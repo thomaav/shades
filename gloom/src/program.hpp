@@ -10,7 +10,7 @@
 
 
 // Main OpenGL program
-void runProgram(GLFWwindow* window);
+void runProgram(GLFWwindow* window, int argc, char *argv[]);
 
 
 // Function for handling keypresses

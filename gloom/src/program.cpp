@@ -10,9 +10,14 @@
 #include <thread>
 #include <future>
 #include <utility>
+#include <string>
+#include <iostream>
 
-void runProgram(GLFWwindow* window)
+void runProgram(GLFWwindow* window, int argc, char *argv[])
 {
+    if (argc >= 2 && !std::string(argv[1]).compare("--mute"))
+        enable_audio = false;
+
     std::promise<bool> stop_music;
     std::future<bool> music_stopped = stop_music.get_future();
     std::thread music_thread(playWAV, "../gloom/audio/danger.wav", std::move(music_stopped));

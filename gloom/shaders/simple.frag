@@ -20,7 +20,7 @@ const vec3 underwater_color = vec3(0.0f, 0.0f, 0.10f);
 const vec3 sunny_sky_color = vec3(0.31f, 0.62f, 0.86f);
 const vec3 rainy_sky_color = vec3(0.22f, 0.26f, 0.29f);
 const vec3 sphere_color = vec3(0.2f, 0.3f, 0.4f);
-const vec3 periscope_color = vec3(0.4f, 0.4f, 0.4f);
+const vec3 periscope_color = vec3(0.0f, 0.0f, 0.0f);
 
 float lightning_coeff = 0.0f;
 float cloud_diffusion = 0.3f;
@@ -40,7 +40,7 @@ vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 
 #define PERISCOPE_Z_TRANSLATION (time/2 - 5.0f)
 #define PERISCOPE_Y_TRANSLATION (-0.3f)
-#define PERISCOPE_X_TRANSLATION (0.0f)
+#define PERISCOPE_X_TRANSLATION (4.0f)
 #define PERISCOPE_CYL_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION - 0.42, PERISCOPE_Z_TRANSLATION)))
 #define PERISCOPE_TOR_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION + 0.15f, PERISCOPE_Z_TRANSLATION+0.05)))
 #define PERISCOPE_WIN_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION + 0.15f, PERISCOPE_Z_TRANSLATION+0.15)))
@@ -589,16 +589,33 @@ vec4 shade_scene()
     }
 
     if (dist_periscope < dist_plane && dist_periscope < dist_sphere) {
-        vec3 orb_color = sphere_color;
         vec3 p_periscope = eye + dist_periscope*ray_dir;
         vec3 n_periscope = est_normal(p_periscope);
 
         if (abs(dist_periscope - trace_window(eye, ray_dir, MIN_DIST, MAX_DIST)) < 0.001)
             return vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-        col = vec4(phong_illumination(k_a, k_d, vec3(0.1f), 2.0f,
+        col = vec4(phong_illumination(k_a, k_d, k_s, 32.0f,
                                       p_periscope, eye, periscope_color,
                                       n_periscope), 1.0f);
+
+        // This is so expensive and unnecessary and increases the
+        // compilation time of the shader by so much (probably by the
+        // inlining in some way(?)) it should really not be done, but
+        // it looks a little bit slightly cool so I'll keep it.
+        #ifdef REFLECTION
+        vec3 refl_dir = reflect(ray_dir, n_periscope);
+        float refl_dist_water = trace_plane(p_periscope, refl_dir, MIN_DIST, MAX_DIST);
+        vec4 reflection = vec4(rainy_sky_color, 1.0f);
+        if (refl_dist_water < MAX_DIST - EPSILON) {
+            vec3 refl_p_water = p_periscope + refl_dist_water*refl_dir;
+            vec3 refl_water_n = est_normal(refl_p_water);
+            reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess,
+                                                 refl_p_water, p_periscope, underwater_color,
+                                                 refl_water_n), 1.0f);
+        }
+        col = mix(col, reflection, 0.4f);
+        #endif
      } else if (dist_plane < dist_sphere) {
         vec3 p_plane = eye + dist_plane*ray_dir;
         vec3 n_plane = est_normal(p_plane);
@@ -635,6 +652,7 @@ vec4 shade_scene()
                                                  refl_sphere_n), 1.0f);
         }
         col = mix(col, reflection, fresnel);
+        #endif
 
         #ifdef RAIN_SPLASH
         vec2 q = (gl_FragCoord.xy / window_size)*500.0f;
@@ -644,8 +662,6 @@ vec4 shade_scene()
         float splash = random(i);
         if (splash >= 0.999f)
             col = mix(col, vec4(1.0f), 0.5f);
-        #endif
-
         #endif
     } else {
         vec3 orb_color = sphere_color;

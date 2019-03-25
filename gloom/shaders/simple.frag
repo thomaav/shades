@@ -37,9 +37,15 @@ const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, SPHERE_Y_TRANSLATION, 0.0f)))
 #define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, sphere_radius()))
 
+#define BINOCULAR_Z_TRANSLATION (time/2 - 5.0f)
+#define BINOCULAR_X_TRANSLATION (time/2 - 2.0f)
+#define BINOCULAR_CYL_TRANSLATION (sd_translate(p, vec3(BINOCULAR_X_TRANSLATION, 0.0f, BINOCULAR_Z_TRANSLATION)))
+#define BINOCULAR_TOR_TRANSLATION (sd_translate(p, vec3(BINOCULAR_X_TRANSLATION-0.1, 0.15f, BINOCULAR_Z_TRANSLATION+0.1)))
+#define sd_binocular_call (sd_scene_binoculars(p))
+
 #define REFLECTION
 #define REFRACTION
-#define SHADOW
+// #define SHADOW
 // #define AO
 #define RAIN
 #define RAIN_SPLASH
@@ -79,7 +85,7 @@ float noise(vec2 st)
     vec2 i = floor(st);
     vec2 f = floor(st);
 
-    // Create four corners of a 2D tile from random.
+   // Create four corners of a 2D tile from random.
     float a = random(i);
     float b = random(i + vec2(1.0, 0.0));
     float c = random(i + vec2(0.0, 1.0));
@@ -178,6 +184,12 @@ float sphere_radius()
     return 0.45 + normalize_range(60.0f, 120.0f, 0.0f, 0.2f, bass_amplitude);
 }
 
+// From here there are a couple different SDF functions for different
+// shapes. Inigo Quilez has written a lot of great articles on this on
+// his blog:
+// https://iquilezles.org/www/articles/distfunctions/distfunctions.htm. It
+// is also possible to watch it in action at
+// https://www.shadertoy.com/view/Xds3zN.
 float sd_sphere(vec3 p, float r)
 {
     return length(p) - r;
@@ -187,6 +199,19 @@ float sd_box(vec3 p, vec3 b, float r)
 {
     vec3 d = abs(p) - b;
     return length(max(d, 0.0f)) - r;
+}
+
+// Vertical sylinder, arbitrary orientation is a bit more tricky.
+float sd_cylinder(vec3 p, vec2 dim)
+{
+    vec2 d = abs(vec2(length(p.xz), p.y)) - dim;
+    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0f));
+}
+
+float sd_torus(vec3 p, vec2 t)
+{
+    vec2 q = vec2(length(p.xz)- t.x, p.y);
+    return length(q) - t.y;
 }
 
 float sd_intersect(float sda, float sdb)
@@ -216,12 +241,18 @@ float sd_displace(vec3 p)
     return sin(45.0f*p.x) * sin(45.0f*p.y) * sin(45.0f*p.z);
 }
 
+vec4 sd_elongate(vec3 p, vec3 dim)
+{
+    vec3 q = abs(p) - dim;
+    return vec4(max(q, 0.0f), min(max(q.x, max(q.y, q.z)), 0.0));
+}
+
 vec3 sd_translate(vec3 p, vec3 translation)
 {
     return p - translation;
 }
 
-vec3 sd_rotate(vec3 p, float theta)
+vec3 sd_rotateY(vec3 p, float theta)
 {
     return (mat4(
         vec4(cos(theta), 0.0f, sin(theta), 0.0f),
@@ -231,12 +262,14 @@ vec3 sd_rotate(vec3 p, float theta)
     ) * vec4(p, 1.0f)).xyz;
 }
 
-float sd_scene(vec3 p)
+vec3 sd_rotateZ(vec3 p, float theta)
 {
-    float plane = sd_waves(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
-    float sphere = sd_sphere_call;
-
-    return sd_union(plane, sphere);
+    return (mat4(
+        vec4(cos(theta), -sin(theta), 0.0f, 0.0f),
+        vec4(sin(theta), cos(theta), 0.0f, 0.0f),
+        vec4(0.0f, 0.0f, 1.0f, 0.0f),
+        vec4(0.0f, 0.0f, 0.0f, 1.0f)
+    ) * vec4(p, 1.0f)).xyz;
 }
 
 float sd_scene_sphere(vec3 p)
@@ -244,9 +277,30 @@ float sd_scene_sphere(vec3 p)
     return sd_sphere_call;
 }
 
+float sd_scene_binoculars(vec3 p)
+{
+    float cylinder = sd_cylinder(BINOCULAR_CYL_TRANSLATION, vec2(0.06f, 0.2f));
+
+    vec3 p_torus = (BINOCULAR_TOR_TRANSLATION.xzy);
+    vec4 torus_elongation = sd_elongate(p_torus,  vec3(0.0, 0.0, 0.0));
+    float torus = min(1e10, torus_elongation.w + sd_torus(torus_elongation.xyz, vec2(0.1, 0.03)));
+    return sd_union(cylinder, torus);
+}
+
 float sd_scene_plane(vec3 p)
 {
     return sd_waves(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
+}
+
+float sd_scene(vec3 p)
+{
+    float plane = sd_waves(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
+    float sphere = sd_sphere_call;
+    float binoculars = sd_binocular_call;
+
+    float un = sd_union(plane, sphere);
+    un = sd_union(un, binoculars);
+    return un;
 }
 
 float trace_sphere(vec3 eye, vec3 dir, float start, float end)
@@ -255,6 +309,24 @@ float trace_sphere(vec3 eye, vec3 dir, float start, float end)
 
     for (int i = 0; i < MARCHSTEPS; ++i) {
         float dist = sd_scene_sphere(eye + depth * dir);
+
+        if (dist < EPSILON)
+            return depth;
+
+        depth += dist;
+        if (depth >= end)
+            return end;
+    }
+
+    return end;
+}
+
+float trace_binoculars(vec3 eye, vec3 dir, float start, float end)
+{
+    float depth = start;
+
+    for (int i = 0; i < MARCHSTEPS; ++i) {
+        float dist = sd_scene_binoculars(eye + depth * dir);
 
         if (dist < EPSILON)
             return depth;
@@ -423,6 +495,7 @@ vec4 shade_scene()
 
     float dist_plane = trace_plane(eye, ray_dir, MIN_DIST, MAX_DIST);
     float dist_sphere = trace_sphere(eye, ray_dir, MIN_DIST, MAX_DIST);
+    float dist_binoculars = trace_binoculars(eye, ray_dir, MIN_DIST, MAX_DIST);
 
     vec4 col = vec4(rainy_sky_color, 1.0f);
 
@@ -476,7 +549,15 @@ vec4 shade_scene()
         return col;
     }
 
-    if (dist_plane < dist_sphere) {
+    if (dist_binoculars < dist_plane && dist_binoculars < dist_sphere) {
+        vec3 orb_color = sphere_color;
+        vec3 p_binoculars = eye + dist_binoculars*ray_dir;
+        vec3 n_binoculars = est_normal(p_binoculars);
+
+        col = vec4(phong_illumination(k_a, k_d, k_s, shininess,
+                                      p_binoculars, eye, orb_color,
+                                      est_sphere_normal(p_binoculars, sphere_radius())), 1.0f);
+     } else if (dist_plane < dist_sphere) {
         vec3 p_plane = eye + dist_plane*ray_dir;
         vec3 n_plane = est_normal(p_plane);
 
@@ -530,7 +611,7 @@ vec4 shade_scene()
 
         #ifdef PLANET
         vec2 uv;
-        uv.x = atan(p_sphere.x, p_sphere.z)/(6.2831*2.0) - time*0.15;
+        uv.x = atan(p_sphere.x, p_sphere.z)/(6.2831*2.0) - time*0.05;
         uv.y = (acos(p_sphere.y + SPHERE_Y_TRANSLATION*-1.0f)/3.1416)*0.5;
 
         vec3 planet_color = texture(planet_texture, 0.5*uv.yx).xyz;

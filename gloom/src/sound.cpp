@@ -87,15 +87,16 @@ void playWAV(const char *fp, std::future<bool> &&stop)
     alSourcePlay(alSource);
 
     // Use where we are currently positioned within the music to
-    // calculate the FFT.
+    // calculate the FFT. The use of a future here is complete abuse
+    // of the pattern, but it was used in a different, blocking way
+    // before.
     ALint offset;
-    while (true) {
+    auto fs = stop.wait_for(std::chrono::seconds(0));
+    while (fs == std::future_status::timeout) {
         alGetSourcei(alSource, AL_SAMPLE_OFFSET, &offset);
         bass_amplitude = fft_bass_amplitude(left_channel_data + offset, 4410);
+        fs = stop.wait_for(std::chrono::seconds(0));
     }
-
-    // Wait until the main thread tells us to stop playing.
-    stop.get();
 
     // Clean up.
     delete[] left_channel_data;

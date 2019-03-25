@@ -45,6 +45,19 @@ const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define WATER_FOAM
 #define CLOUDS
 #define PLANET
+#define LIGHTNING
+
+// https://stackoverflow.com/questions/10364575/normalization-in-variable-range-x-y-in-matlab
+float normalize_range(float f_min, float f_max, float t_min, float t_max, float x)
+{
+    float range = f_max - f_min;
+    float range2 = t_max - t_min;
+
+    float normalized_x = (x - f_min) / range;
+    normalized_x = (normalized_x * range2) + t_min;
+
+    return normalized_x;
+}
 
 // https://thebookofshaders.com/13/.
 float random(vec2 st)
@@ -155,19 +168,7 @@ float sd_plane(vec3 p)
 // amplitude output from an FFT.
 float sphere_radius()
 {
-    float min_amplitude = 60.0f;
-    float max_amplitude = 120.0f;
-    float range = max_amplitude - min_amplitude;
-
-    // https://stackoverflow.com/questions/10364575/normalization-in-variable-range-x-y-in-matlab
-    float min_scale = 0.0f;
-    float max_scale = 0.2f;
-    float range2 = max_scale - min_scale;
-
-    float normalized_bass = (bass_amplitude - min_amplitude) / range;
-    normalized_bass = (normalized_bass * range2) + min_scale;
-
-    return 0.45 + normalized_bass;
+    return 0.45 + normalize_range(60.0f, 120.0f, 0.0f, 0.2f, bass_amplitude);
 }
 
 float sd_sphere(vec3 p, float r)
@@ -440,8 +441,15 @@ vec4 shade_scene()
         float cloud_fbm = fbm(uv - vec2(time / 10, 0.0));
         cloud_fbm = 1.0 - abs(cloud_fbm*2.0 - 1.0);
         vec3 cloud = pow(vec3(cloud_fbm), vec3(cloud_diffusion)) - (uv.y + 3.0)*cloud_darkness;
+
+        #ifdef LIGHTNING
+        float lightning_coeff = normalize_range(60.0f, 120.0f, 0.0f, 2.0f, bass_amplitude);
+        // cloud += vec3(1.0f) * (sin(time*3.0)*2.0 + 1.0)*pow(length(cloud), 2);
+        cloud += vec3(1.0f) * lightning_coeff*pow(length(cloud), 2);
+        #endif
         col = mix(col, vec4(cloud, 1.0f), cloud_blend);
         #endif
+
 
         #ifdef RAIN
         col += rain;
@@ -539,5 +547,14 @@ vec4 shade_scene()
 
 void main()
 {
-    color = shade_scene();
+    vec4 scene_col = shade_scene();
+
+    #ifdef LIGHTNING
+    // vec4 lightning = vec4(0.0f);
+    // if (bass_amplitude > 110.0f)
+    //     lightning = vec4(0.2f);
+    // scene_col += lightning;
+    #endif
+
+    color = scene_col;
 }

@@ -20,6 +20,7 @@ const vec3 underwater_color = vec3(0.0f, 0.0f, 0.10f);
 const vec3 sunny_sky_color = vec3(0.31f, 0.62f, 0.86f);
 const vec3 rainy_sky_color = vec3(0.22f, 0.26f, 0.29f);
 const vec3 sphere_color = vec3(0.2f, 0.3f, 0.4f);
+const vec3 periscope_color = vec3(0.4f, 0.4f, 0.4f);
 
 float lightning_coeff = 0.0f;
 float cloud_diffusion = 0.3f;
@@ -30,7 +31,7 @@ const float weather_strength = 0.15f;
 const float waves_height = 1.0f;
 const int waves_precision = 5;
 
-const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
+vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 
 // #define SPHERE_Y_TRANSLATION (sin (time) * - 1.0f)
 #define SPHERE_Y_TRANSLATION 1.0f
@@ -38,9 +39,11 @@ const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, sphere_radius()))
 
 #define PERISCOPE_Z_TRANSLATION (time/2 - 5.0f)
-#define PERISCOPE_X_TRANSLATION (time/2 - 2.0f)
-#define PERISCOPE_CYL_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, 0.0f, PERISCOPE_Z_TRANSLATION)))
-#define PERISCOPE_TOR_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION-0.1, 0.15f, PERISCOPE_Z_TRANSLATION+0.1)))
+#define PERISCOPE_Y_TRANSLATION (-0.3f)
+#define PERISCOPE_X_TRANSLATION (0.0f)
+#define PERISCOPE_CYL_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION - 0.42, PERISCOPE_Z_TRANSLATION)))
+#define PERISCOPE_TOR_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION + 0.15f, PERISCOPE_Z_TRANSLATION+0.05)))
+#define PERISCOPE_WIN_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION + 0.15f, PERISCOPE_Z_TRANSLATION+0.15)))
 #define sd_periscope_call (sd_scene_periscope(p))
 
 #define REFLECTION
@@ -53,6 +56,7 @@ const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define CLOUDS
 #define PLANET
 #define LIGHTNING
+// #define MOVE_CAMERA
 
 // https://stackoverflow.com/questions/10364575/normalization-in-variable-range-x-y-in-matlab
 float normalize_range(float f_min, float f_max, float t_min, float t_max, float x)
@@ -279,12 +283,25 @@ float sd_scene_sphere(vec3 p)
 
 float sd_scene_periscope(vec3 p)
 {
-    float cylinder = sd_cylinder(PERISCOPE_CYL_TRANSLATION, vec2(0.06f, 0.2f));
+    p.y += sin(time)/10.0f;
+
+    float cylinder = sd_cylinder(PERISCOPE_CYL_TRANSLATION, vec2(0.07f, 0.50f));
+    float window = sd_cylinder(PERISCOPE_WIN_TRANSLATION.xzy, vec2(0.1f, 0.001));
 
     vec3 p_torus = (PERISCOPE_TOR_TRANSLATION.xzy);
-    vec4 torus_elongation = sd_elongate(p_torus,  vec3(0.0, 0.0, 0.0));
-    float torus = min(1e10, torus_elongation.w + sd_torus(torus_elongation.xyz, vec2(0.1, 0.03)));
-    return sd_union(cylinder, torus);
+    vec4 torus_elongation = sd_elongate(p_torus,  vec3(0.0, 0.1, 0.0));
+    float torus = min(1e10, torus_elongation.w + sd_torus(torus_elongation.xyz, vec2(0.1, 0.01)));
+
+    float scene = sd_smooth_union(cylinder, torus, 0.05f);
+    scene = sd_union(scene, window);
+    return scene;
+}
+
+float sd_scene_window(vec3 p)
+{
+    p.y += sin(time)/10.0f;
+
+    return sd_cylinder(PERISCOPE_WIN_TRANSLATION.xzy, vec2(0.1f, 0.001));
 }
 
 float sd_scene_plane(vec3 p)
@@ -327,6 +344,24 @@ float trace_periscope(vec3 eye, vec3 dir, float start, float end)
 
     for (int i = 0; i < MARCHSTEPS; ++i) {
         float dist = sd_scene_periscope(eye + depth * dir);
+
+        if (dist < EPSILON)
+            return depth;
+
+        depth += dist;
+        if (depth >= end)
+            return end;
+    }
+
+    return end;
+}
+
+float trace_window(vec3 eye, vec3 dir, float start, float end)
+{
+    float depth = start;
+
+    for (int i = 0; i < MARCHSTEPS; ++i) {
+        float dist = sd_scene_window(eye + depth * dir);
 
         if (dist < EPSILON)
             return depth;
@@ -488,8 +523,12 @@ vec4 shade_scene()
     vec3 k_s = vec3(0.4f, 0.4f, 0.4f);
     float shininess = 16.0f;
 
-    vec3 ray_dir = ray_direction(45.0f, window_size, gl_FragCoord.xy);
     vec3 eye = scene_eye;
+    #ifdef MOVE_CAMERA
+    eye = sd_rotateY(eye, time/20);
+    #endif
+
+    vec3 ray_dir = ray_direction(45.0f, window_size, gl_FragCoord.xy);
     mat4 camera_mat = camera(eye, vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
     ray_dir = (camera_mat * vec4(ray_dir, 1.0f)).xyz;
 
@@ -554,9 +593,12 @@ vec4 shade_scene()
         vec3 p_periscope = eye + dist_periscope*ray_dir;
         vec3 n_periscope = est_normal(p_periscope);
 
-        col = vec4(phong_illumination(k_a, k_d, k_s, shininess,
-                                      p_periscope, eye, orb_color,
-                                      est_sphere_normal(p_periscope, sphere_radius())), 1.0f);
+        if (abs(dist_periscope - trace_window(eye, ray_dir, MIN_DIST, MAX_DIST)) < 0.001)
+            return vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+        col = vec4(phong_illumination(k_a, k_d, vec3(0.1f), 2.0f,
+                                      p_periscope, eye, periscope_color,
+                                      n_periscope), 1.0f);
      } else if (dist_plane < dist_sphere) {
         vec3 p_plane = eye + dist_plane*ray_dir;
         vec3 n_plane = est_normal(p_plane);

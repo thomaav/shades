@@ -668,6 +668,15 @@ vec4 shade_scene()
         // Mix in the clouds of the planet.
         vec3 cloud = texture(planet_texture, 2.0*uv).xxx;
         orb_color = mix(orb_color, vec3(0.9), 0.75*smoothstep(0.55, 0.8, cloud.x));
+
+        // Only reflect light that hits the water, as the clouds and
+        // ground should be matte.
+        if (!(orb_color.b >= 0.3f && orb_color.r <= 0.3f && orb_color.g <= 0.3f)) {
+            k_s = vec3(0.0f);
+        } else {
+            k_s = vec3(0.7f);
+            shininess = 8.0f;
+        }
         #endif
 
         col = vec4(phong_illumination(k_a, k_d, k_s, shininess,

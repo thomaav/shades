@@ -37,11 +37,11 @@ const vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, SPHERE_Y_TRANSLATION, 0.0f)))
 #define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, sphere_radius()))
 
-#define BINOCULAR_Z_TRANSLATION (time/2 - 5.0f)
-#define BINOCULAR_X_TRANSLATION (time/2 - 2.0f)
-#define BINOCULAR_CYL_TRANSLATION (sd_translate(p, vec3(BINOCULAR_X_TRANSLATION, 0.0f, BINOCULAR_Z_TRANSLATION)))
-#define BINOCULAR_TOR_TRANSLATION (sd_translate(p, vec3(BINOCULAR_X_TRANSLATION-0.1, 0.15f, BINOCULAR_Z_TRANSLATION+0.1)))
-#define sd_binocular_call (sd_scene_binoculars(p))
+#define PERISCOPE_Z_TRANSLATION (time/2 - 5.0f)
+#define PERISCOPE_X_TRANSLATION (time/2 - 2.0f)
+#define PERISCOPE_CYL_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, 0.0f, PERISCOPE_Z_TRANSLATION)))
+#define PERISCOPE_TOR_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION-0.1, 0.15f, PERISCOPE_Z_TRANSLATION+0.1)))
+#define sd_periscope_call (sd_scene_periscope(p))
 
 #define REFLECTION
 #define REFRACTION
@@ -277,11 +277,11 @@ float sd_scene_sphere(vec3 p)
     return sd_sphere_call;
 }
 
-float sd_scene_binoculars(vec3 p)
+float sd_scene_periscope(vec3 p)
 {
-    float cylinder = sd_cylinder(BINOCULAR_CYL_TRANSLATION, vec2(0.06f, 0.2f));
+    float cylinder = sd_cylinder(PERISCOPE_CYL_TRANSLATION, vec2(0.06f, 0.2f));
 
-    vec3 p_torus = (BINOCULAR_TOR_TRANSLATION.xzy);
+    vec3 p_torus = (PERISCOPE_TOR_TRANSLATION.xzy);
     vec4 torus_elongation = sd_elongate(p_torus,  vec3(0.0, 0.0, 0.0));
     float torus = min(1e10, torus_elongation.w + sd_torus(torus_elongation.xyz, vec2(0.1, 0.03)));
     return sd_union(cylinder, torus);
@@ -296,10 +296,10 @@ float sd_scene(vec3 p)
 {
     float plane = sd_waves(sd_translate(p, vec3(0.0f, -0.5f, 0.0f)));
     float sphere = sd_sphere_call;
-    float binoculars = sd_binocular_call;
+    float periscope = sd_periscope_call;
 
     float un = sd_union(plane, sphere);
-    un = sd_union(un, binoculars);
+    un = sd_union(un, periscope);
     return un;
 }
 
@@ -321,12 +321,12 @@ float trace_sphere(vec3 eye, vec3 dir, float start, float end)
     return end;
 }
 
-float trace_binoculars(vec3 eye, vec3 dir, float start, float end)
+float trace_periscope(vec3 eye, vec3 dir, float start, float end)
 {
     float depth = start;
 
     for (int i = 0; i < MARCHSTEPS; ++i) {
-        float dist = sd_scene_binoculars(eye + depth * dir);
+        float dist = sd_scene_periscope(eye + depth * dir);
 
         if (dist < EPSILON)
             return depth;
@@ -495,7 +495,7 @@ vec4 shade_scene()
 
     float dist_plane = trace_plane(eye, ray_dir, MIN_DIST, MAX_DIST);
     float dist_sphere = trace_sphere(eye, ray_dir, MIN_DIST, MAX_DIST);
-    float dist_binoculars = trace_binoculars(eye, ray_dir, MIN_DIST, MAX_DIST);
+    float dist_periscope = trace_periscope(eye, ray_dir, MIN_DIST, MAX_DIST);
 
     vec4 col = vec4(rainy_sky_color, 1.0f);
 
@@ -549,14 +549,14 @@ vec4 shade_scene()
         return col;
     }
 
-    if (dist_binoculars < dist_plane && dist_binoculars < dist_sphere) {
+    if (dist_periscope < dist_plane && dist_periscope < dist_sphere) {
         vec3 orb_color = sphere_color;
-        vec3 p_binoculars = eye + dist_binoculars*ray_dir;
-        vec3 n_binoculars = est_normal(p_binoculars);
+        vec3 p_periscope = eye + dist_periscope*ray_dir;
+        vec3 n_periscope = est_normal(p_periscope);
 
         col = vec4(phong_illumination(k_a, k_d, k_s, shininess,
-                                      p_binoculars, eye, orb_color,
-                                      est_sphere_normal(p_binoculars, sphere_radius())), 1.0f);
+                                      p_periscope, eye, orb_color,
+                                      est_sphere_normal(p_periscope, sphere_radius())), 1.0f);
      } else if (dist_plane < dist_sphere) {
         vec3 p_plane = eye + dist_plane*ray_dir;
         vec3 n_plane = est_normal(p_plane);

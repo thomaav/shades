@@ -18,9 +18,10 @@ void runProgram(GLFWwindow* window, int argc, char *argv[])
     if (argc >= 2 && !std::string(argv[1]).compare("--mute"))
         enable_audio = false;
 
+    // https://www.youtube.com/watch?v=WeIIrFhrePE
     std::promise<bool> stop_music;
     std::future<bool> music_stopped = stop_music.get_future();
-    std::thread music_thread(playWAV, "../gloom/audio/danger.wav", std::move(music_stopped));
+    std::thread music_thread(playWAV, "../gloom/audio/bassloop.wav", std::move(music_stopped));
 
     // Enable depth (Z) buffer (accept "closest" fragment)
     glEnable(GL_DEPTH_TEST);

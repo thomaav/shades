@@ -19,7 +19,7 @@ const float PI = 3.1415926535897932384626433832795;
 const vec3 underwater_color = vec3(0.0f, 0.0f, 0.10f);
 const vec3 sunny_sky_color = vec3(0.31f, 0.62f, 0.86f);
 const vec3 rainy_sky_color = vec3(0.22f, 0.26f, 0.29f);
-const vec3 sphere_color = vec3(0.2f, 0.3f, 0.4f);
+const vec3 sphere_color = vec3(1.0f, 0.2f, 0.0f);
 const vec3 periscope_color = vec3(0.0f, 0.0f, 0.0f);
 
 float lightning_coeff = 0.0f;
@@ -41,9 +41,12 @@ vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define PERISCOPE_Z_TRANSLATION (time/2 - 5.0f)
 #define PERISCOPE_Y_TRANSLATION (-0.3f)
 #define PERISCOPE_X_TRANSLATION (4.0f)
-#define PERISCOPE_CYL_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION - 0.42, PERISCOPE_Z_TRANSLATION)))
-#define PERISCOPE_TOR_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION + 0.15f, PERISCOPE_Z_TRANSLATION+0.05)))
-#define PERISCOPE_WIN_TRANSLATION (sd_translate(p, vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION + 0.15f, PERISCOPE_Z_TRANSLATION+0.15)))
+#define PERISCOPE_CYL_TRANSLATION (sd_translate(p, \
+    vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION - 0.42, PERISCOPE_Z_TRANSLATION)))
+#define PERISCOPE_TOR_TRANSLATION (sd_translate(p, \
+    vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION + 0.15f, PERISCOPE_Z_TRANSLATION+0.05)))
+#define PERISCOPE_WIN_TRANSLATION (sd_translate(p, \
+    vec3(PERISCOPE_X_TRANSLATION, PERISCOPE_Y_TRANSLATION + 0.15f, PERISCOPE_Z_TRANSLATION+0.15)))
 #define sd_periscope_call (sd_scene_periscope(p))
 
 #define REFLECTION
@@ -516,6 +519,34 @@ mat4 camera(vec3 eye, vec3 center, vec3 up)
     );
 }
 
+vec3 shade_orb(vec3 orb_color, vec3 p_sphere, bool ground_level)
+{
+    vec2 uv;
+
+    // Pretty standard wrapping of a square texture around a
+    // sphere.
+    uv.x = atan(p_sphere.x, p_sphere.z)/(6.2831*2.0) - time*0.05;
+    uv.y = (acos(p_sphere.y + SPHERE_Y_TRANSLATION*-1.0f)/3.1416)*0.5;
+
+
+    vec3 planet_color = texture(planet_texture, uv.yx).xyz;
+
+    orb_color = mix(orb_color,
+                    vec3(1.0f, 1.0f, 0.0f),
+                    smoothstep(0.5f, 1.0f, fbm(uv)));
+
+    // if (!ground_level)
+    //     return orb_color;
+
+    // Mix in ground level of the planet.
+    orb_color = mix(orb_color,
+                    ((vec3(0.0f) +
+                      0.20*texture(planet_texture, 15.5*uv.yx).xyz)*0.4),
+                    smoothstep(0.1, 0.2, planet_color.x));
+
+    return orb_color;
+}
+
 vec4 shade_scene()
 {
     vec3 k_a = vec3(0.5f, 0.5f, 0.5f);
@@ -647,10 +678,17 @@ vec4 shade_scene()
         if (refl_dist_sphere < MAX_DIST - EPSILON) {
             vec3 refl_p_sphere = p_plane + refl_dist_sphere*refl_dir;
             vec3 refl_sphere_n = est_sphere_normal(refl_p_sphere, sphere_radius());
+
+            #ifdef PLANET
+            reflection = vec4(shade_orb(sphere_color, refl_p_sphere, false), 1.0f);
+            fresnel = pow(1.0f-abs(dot(ray_dir, n_plane)), 7.0f);
+            #else
             reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess,
                                                  refl_p_sphere, p_plane, sphere_color,
                                                  refl_sphere_n), 1.0f);
+            #endif
         }
+
         col = mix(col, reflection, fresnel);
         #endif
 
@@ -667,37 +705,27 @@ vec4 shade_scene()
         vec3 orb_color = sphere_color;
         vec3 p_sphere = eye + dist_sphere*ray_dir;
 
+        // Adapted from iqs very nice
+        // https://www.shadertoy.com/view/4sf3Rn.
         #ifdef PLANET
-        vec2 uv;
-        uv.x = atan(p_sphere.x, p_sphere.z)/(6.2831*2.0) - time*0.05;
-        uv.y = (acos(p_sphere.y + SPHERE_Y_TRANSLATION*-1.0f)/3.1416)*0.5;
-
-        vec3 planet_color = texture(planet_texture, 0.5*uv.yx).xyz;
-
-        // Mix in ground level of the planet.
-        orb_color = mix(orb_color,
-                        ((vec3(0.2, 0.5, 0.1)*0.55 +
-                          0.45*planet_color +
-                          0.5*texture(planet_texture, 15.5*uv.yx).xyz)*0.4),
-                        smoothstep(0.45, 0.5, planet_color.x));
-
-        // Mix in the clouds of the planet.
-        vec3 cloud = texture(planet_texture, 2.0*uv).xxx;
-        orb_color = mix(orb_color, vec3(0.9), 0.75*smoothstep(0.55, 0.8, cloud.x));
-
-        // Only reflect light that hits the water, as the clouds and
-        // ground should be matte.
-        if (!(orb_color.b >= 0.3f && orb_color.r <= 0.3f && orb_color.g <= 0.3f)) {
-            k_s = vec3(0.0f);
-        } else {
-            k_s = vec3(0.7f);
-            shininess = 8.0f;
-        }
+        orb_color = shade_orb(orb_color, p_sphere, true);
         #endif
 
-        col = vec4(phong_illumination(k_a, k_d, k_s, shininess,
-                                      p_sphere, eye, orb_color,
-                                      est_sphere_normal(p_sphere, sphere_radius())), 1.0f);
+        col = vec4(orb_color, 1.0f);
+
+        // Specular shade manually.
+        vec3 N =  est_sphere_normal(p_sphere, sphere_radius());
+
+        vec3 light_pos = vec3(10.0f, 8.0f, -10.0f);
+        vec3 L = normalize(light_pos - p_sphere);
+        vec3 V = normalize(eye - p_sphere);
+        vec3 R = normalize(reflect(-L, N));
+        float dot_RV = dot(R, V);
+
+        // Use the red intensity to determine how much to specularly
+        // light the orb.
+        if (!(dot_RV < 0.0f))
+            col += vec4(1.0f) * 0.5 * pow(dot_RV, 2.0f) * col.r;
     }
 
     #ifdef RAIN

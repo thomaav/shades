@@ -13,7 +13,6 @@ const int MARCHSTEPS = 400;
 const float MIN_DIST = 0.0f;
 const float MAX_DIST = 100.0f;
 const float EPSILON = 0.0005;
-const float AA = 2.0f;
 const float PI = 3.1415926535897932384626433832795;
 
 const vec3 underwater_color = vec3(0.0f, 0.0f, 0.10f);
@@ -27,13 +26,13 @@ float cloud_diffusion = 0.3f;
 const float cloud_darkness = 0.2;
 const float cloud_blend = 0.4f;
 
-const float weather_strength = 0.15f;
+const float weather_strength = 0.10f;
 const float waves_height = 1.0f;
 const int waves_precision = 5;
 
 vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
+vec3 global_light_pos = vec3(10.0f, 8.0f, -10.0f);
 
-// #define SPHERE_Y_TRANSLATION (sin (time) * - 1.0f)
 #define SPHERE_Y_TRANSLATION 1.0f
 #define SPHERE_TRANSLATION (sd_translate(p, vec3(0.0f, SPHERE_Y_TRANSLATION, 0.0f)))
 #define sd_sphere_call (sd_sphere(SPHERE_TRANSLATION, sphere_radius()))
@@ -50,18 +49,18 @@ vec3 scene_eye = vec3(10.0f, 1.0f, 5.0f);
 #define sd_periscope_call (sd_scene_periscope(p))
 
 #define REFLECTION
+#define REFLECTION_PERISCOPE
 #define REFRACTION
 // #define SHADOW
 // #define AO
 #define RAIN
 #define RAIN_SPLASH
-#define WATER_FOAM
 #define CLOUDS
 #define PLANET
 #define LIGHTNING
 // #define MOVE_CAMERA
 
-// https://stackoverflow.com/questions/10364575/normalization-in-variable-range-x-y-in-matlab
+// https://stackoverflow.com/questions/10364575/normalization-in-variable-range-x-y-in-matlab.
 float normalize_range(float f_min, float f_max, float t_min, float t_max, float x)
 {
     float range = f_max - f_min;
@@ -82,7 +81,7 @@ float random(float x)
 // https://thebookofshaders.com/10/.
 float random(vec2 st)
 {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) *48301.231*sin(time/3));
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 48301.231*sin(time/3));
 }
 
 // https://thebookofshaders.com/13/.
@@ -117,6 +116,10 @@ vec2 noise(vec3 p)
     // Cubic Hermine Curve (smoothstep).
     f = f*f*(3.0-2.0*f);
 
+    // Until here, everything is similar to the noise function above
+    // using vec2 <st>. However, here we use a loaded texture to
+    // generate the noise, instead of an explicit function -- so we
+    // just sample that texture.
     vec2 uv = (i.xy + vec2(37.0, 17.0)*i.z);
     vec4 rg = textureLod(noise_texture, (uv+f.xy+0.5)/256.0, 0.0);
 
@@ -142,22 +145,38 @@ float fbm(vec2 p)
 
 // See https://www.shadertoy.com/view/XdsGDB or
 // https://www.shadertoy.com/view/Ms2SD1 for how octaves are used to
-// create realistic water maps, much in the same vein as FBM. IQ also
-// explains the method (animated FBM with something like a Perlin
-// noise function) in
+// create realistic water maps, much in the same vein as FBM is used
+// to use superposition to create interesting waves. IQ also explains
+// the method (animated FBM with something like a Perlin noise
+// function) in
 // https://iquilezles.org/www/articles/simplewater/simplewater.htm.
 float sd_waves(vec3 p)
 {
     float plane_height = p.y;
-    p *= vec3(0.2);
+    p *= vec3(0.20);
 
     float f = 0.0;
+    float amplitude = 2.0f;
 
-    // The actual FBM.
+    // The actual FBM. We sample our noise texture, along with the
+    // superpositioning of several waves to create realistic looking
+    // water. The more octaves that is used, the more realistic the
+    // water will look (at the cost of computation, of course). I
+    // thoroughly recommend having a look at
+    // https://thebookofshaders.com/13/ for further insights on this.
     p += time*vec3(0, weather_strength, weather_strength);
     for (int i = 0; i < waves_precision; ++i) {
+        // You don't necessarily _need_ to do this translation, the
+        // waves will look alright without it. It does, however, make
+        // for more "movement" within the motion of the waves.
         p = (p.yzx + p.zyx*vec3(1, -1, 1)) / sqrt(2.0);
-        f = f*2.0 + abs(noise(p).x - 0.5)*2.0;
+
+        // It doesn't really matter _that_ much whether we use the .x
+        // or .y of the 2-dimensional noise. We could even use the
+        // magnitude of it. abs is used to create _sharper_ valleys.
+        f += abs(noise(p).x - 0.5);
+
+        f *= amplitude;
         p *= 2.0;
     }
 
@@ -167,13 +186,8 @@ float sd_waves(vec3 p)
     return plane_height - turbulence;
 }
 
-// Meant for calculating the crests/foam on the wave as they crash
-// (well, not really _crash_, a bit more random than that).
-float sd_waves_foam(vec3 p)
-{
-    return 0.0f;
-}
-
+// The old plane SD-function to create very simple planes displaced by
+// a simple sine.
 float sd_plane(vec3 p)
 {
     float dist = length(p);
@@ -300,6 +314,8 @@ float sd_scene_periscope(vec3 p)
     return scene;
 }
 
+// This is required to be its own scene, as to be able to trace it
+// alone to color it completely black.
 float sd_scene_window(vec3 p)
 {
     p.y += sin(time)/10.0f;
@@ -498,7 +514,7 @@ vec3 phong_illumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha,
     #endif
     vec3 ambient_light = 0.3 * vec3(1.0f, 1.0f, 1.0f);
     vec3 tmp_color = k_a * ambient_light * occlusion;
-    vec3 light_pos = vec3(10.0f, 8.0f, -10.0f);
+    vec3 light_pos = global_light_pos;
 
     tmp_color += phong_light_contrib(k_d, k_s, alpha, p, eye,
                                      light_pos, light_intensity, normal);
@@ -519,7 +535,7 @@ mat4 camera(vec3 eye, vec3 center, vec3 up)
     );
 }
 
-vec3 shade_orb(vec3 orb_color, vec3 p_sphere, bool ground_level)
+vec3 shade_orb(vec3 orb_color, vec3 p_sphere)
 {
     vec2 uv;
 
@@ -534,9 +550,6 @@ vec3 shade_orb(vec3 orb_color, vec3 p_sphere, bool ground_level)
     orb_color = mix(orb_color,
                     vec3(1.0f, 1.0f, 0.0f),
                     smoothstep(0.5f, 1.0f, fbm(uv)));
-
-    // if (!ground_level)
-    //     return orb_color;
 
     // Mix in ground level of the planet.
     orb_color = mix(orb_color,
@@ -555,6 +568,7 @@ vec4 shade_scene()
     float shininess = 16.0f;
 
     vec3 eye = scene_eye;
+
     #ifdef MOVE_CAMERA
     eye = sd_rotateY(eye, time/20);
     #endif
@@ -570,7 +584,8 @@ vec4 shade_scene()
     vec4 col = vec4(rainy_sky_color, 1.0f);
 
     #ifdef RAIN
-    // https://www.shadertoy.com/view/XdSGDc
+    // https://www.shadertoy.com/view/XdSGDc. We create a sheet of
+    // rain to overlay onto the image without caring about depth.
     vec2 q = gl_FragCoord.xy / window_size;
     float f = 10.0f;
     vec2 st = f * (q*vec2(1.5f, 0.05f) + vec2(-time*0.1 + q.y*0.5, time*0.12));
@@ -581,8 +596,10 @@ vec4 shade_scene()
     #endif
 
     #ifdef LIGHTNING
-    // https://www.shadertoy.com/view/Xds3Rj
-    float lightning_seed = random(vec2(sqrt(1.0), floor(time + (1.0 / 10.0)) * 1.0));
+    // Create a seed to check whether the lightning is striking, such
+    // that we can set the diffusion of the clouds differently to see
+    // an acual lightning strike.
+    float lightning_seed = random(vec2(1.0f, floor(time + (1.0 / 10.0))));
     if (lightning_seed >= 0.98) {
         cloud_diffusion = 0.7;
         lightning_coeff = 3.0f;
@@ -593,6 +610,7 @@ vec4 shade_scene()
     #endif
 
     if (min(dist_plane, dist_sphere) > MAX_DIST - EPSILON) {
+        // If we hit absolutely nothing, we are drawing the sky.
         #ifdef CLOUDS
         // https://www.shadertoy.com/view/Xds3Rj for the inspiration
         // for the clouds, changed to use our FBM and noise
@@ -620,6 +638,7 @@ vec4 shade_scene()
     }
 
     if (dist_periscope < dist_plane && dist_periscope < dist_sphere) {
+        // When we hit the periscope.
         vec3 p_periscope = eye + dist_periscope*ray_dir;
         vec3 n_periscope = est_normal(p_periscope);
 
@@ -630,11 +649,7 @@ vec4 shade_scene()
                                       p_periscope, eye, periscope_color,
                                       n_periscope), 1.0f);
 
-        // This is so expensive and unnecessary and increases the
-        // compilation time of the shader by so much (probably by the
-        // inlining in some way(?)) it should really not be done, but
-        // it looks a little bit slightly cool so I'll keep it.
-        #ifdef REFLECTION
+        #ifdef REFLECTION_PERISCOPE
         vec3 refl_dir = reflect(ray_dir, n_periscope);
         float refl_dist_water = trace_plane(p_periscope, refl_dir, MIN_DIST, MAX_DIST);
         vec4 reflection = vec4(rainy_sky_color, 1.0f);
@@ -648,6 +663,7 @@ vec4 shade_scene()
         col = mix(col, reflection, 0.4f);
         #endif
      } else if (dist_plane < dist_sphere) {
+        // When we hit the water.
         vec3 p_plane = eye + dist_plane*ray_dir;
         vec3 n_plane = est_normal(p_plane);
 
@@ -680,7 +696,7 @@ vec4 shade_scene()
             vec3 refl_sphere_n = est_sphere_normal(refl_p_sphere, sphere_radius());
 
             #ifdef PLANET
-            reflection = vec4(shade_orb(sphere_color, refl_p_sphere, false), 1.0f);
+            reflection = vec4(shade_orb(sphere_color, refl_p_sphere), 1.0f);
             fresnel = pow(1.0f-abs(dot(ray_dir, n_plane)), 7.0f);
             #else
             reflection = vec4(phong_illumination(k_a, k_d, k_s, shininess,
@@ -702,13 +718,14 @@ vec4 shade_scene()
             col = mix(col, vec4(1.0f), 0.5f);
         #endif
     } else {
+        // When we hit the orb.
         vec3 orb_color = sphere_color;
         vec3 p_sphere = eye + dist_sphere*ray_dir;
 
         // Adapted from iqs very nice
         // https://www.shadertoy.com/view/4sf3Rn.
         #ifdef PLANET
-        orb_color = shade_orb(orb_color, p_sphere, true);
+        orb_color = shade_orb(orb_color, p_sphere);
         #endif
 
         col = vec4(orb_color, 1.0f);
@@ -716,7 +733,7 @@ vec4 shade_scene()
         // Specular shade manually.
         vec3 N =  est_sphere_normal(p_sphere, sphere_radius());
 
-        vec3 light_pos = vec3(10.0f, 8.0f, -10.0f);
+        vec3 light_pos = global_light_pos;
         vec3 L = normalize(light_pos - p_sphere);
         vec3 V = normalize(eye - p_sphere);
         vec3 R = normalize(reflect(-L, N));
@@ -732,10 +749,6 @@ vec4 shade_scene()
     col += rain;
     #endif
 
-    #ifdef WATER_FOAM
-    ;
-    #endif
-
     return col;
 }
 
@@ -744,9 +757,6 @@ void main()
     vec4 scene_col = shade_scene();
 
     #ifdef LIGHTNING
-    vec4 lightning = vec4(0.0f);
-    if (bass_amplitude > 110.0f)
-        lightning = vec4(0.2f);
     scene_col += vec4(0.05f) * lightning_coeff;
     #endif
 

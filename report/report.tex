@@ -1,4 +1,4 @@
-% Created 2019-04-07 Sun 20:19
+% Created 2019-04-07 Sun 21:34
 \documentclass[abstract=off,oneside]{scrreprt}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -48,7 +48,8 @@ For this report I will go through the process step by step, from the
 baby steps required to render a simple sphere, to the final leaps that
 render a realistic looking scene. There are quite a few illustratory
 images, which reside in the appendix, with links back and forth to
-make the reading slightly less painful.
+make the reading bearable. Limitations with the techniques, as well as
+problems encountered will be pointed out along the way.
 
 \section*{Building the project}
 \label{sec-2}
@@ -121,20 +122,27 @@ sphere. How do we go about turning this into a complex scene? The
 first trick we will pull out of our sleeve is intersections and
 unions. If we compute the distance to more than one object, and then
 do \verb~max~ (intersect) or \verb~min~ between them, we can have multiple
-objects in our scene. The technique can be seen in action \hyperref[fig:union]{here}.
+objects in our scene. The technique can be seen in action \hyperref[fig:union]{here}. A
+problem I encountered at this stage was using GLSL effictively. I
+practically gave up on optimization, but most of all I was missing the
+ability to pass around function pointers for distance functions (which
+could perhaps be done with \verb~switch~ statements anyway, as I'm already
+murdering the performance with all the conditionals).
 
 \section*{Shadows}
 \label{sec-6}
-\label{sec:shadows}
-An advantage of signed distance functions is that they provide us with
-global information. Given a point on a surface in a scene, we can
-fairly easily explore our surroundings -- we just have to recalculate
-the SDF with new points. For shadowing, we simply follow what's called
-a \emph{shadow ray} from the surface point towards the position of a given
-light. If it intersects some other object on the way, the light will
-not contribute to the illumination. We can also put areas that are
-\emph{almost} within the shadow under penumbra by checking how close we are
-to intersecting objects on the way. \hyperref[fig:penumbra]{Illustration}.
+\label{sec:shadows} An advantage of signed distance functions is that they
+provide us with global information. Given a point on a surface in a
+scene, we can fairly easily explore our surroundings -- we just have
+to recalculate the SDF with new points. For shadowing, we simply
+follow what's called a \emph{shadow ray} from the surface point towards the
+position of a given light. If it intersects some other object on the
+way, the ligmht will not contribute to the illumination. We can also
+put areas that are \emph{almost} within the shadow under penumbra by
+checking how close we are to intersecting objects on the
+way. \hyperref[fig:penumbra]{Illustration}. This perhaps the most pressing advantage of ray
+tracing in general: effects such as shadows and reflections are
+natural results of the algorithm.
 
 \section*{Ambient occlusion}
 \label{sec-7}
@@ -146,7 +154,10 @@ a few points around the actual point we are shading. By comparing the
 results of the scene SDF at these points to the original point, we
 gain information about the proximity of other surfaces around us, and
 with this information we can make an educated guess on the occlusion
-of the surface we are \hyperref[fig:ao]{shading}.
+of the surface we are \hyperref[fig:ao]{shading}. A limitation of this method is that
+it's a crude approximation, and may give results that seem \emph{off}
+(e.g. floor occluding \emph{a lot} of the light hitting the bottom of a
+wall).
 
 \section*{Reflection and refraction}
 \label{sec-8}
@@ -158,7 +169,12 @@ with a simple sine, as can be seen \hyperref[fig:simplewater]{here}. Adding refl
 harder than adding shadows -- we simply march again from points of
 intersection in a reflected direction, and mix the reflection color
 with the reflective surface color (\hyperref[fig:reflection]{example}). We also add a fresnel
-effect such that steeper angles give weaker reflections.
+effect such that steeper angles give weaker reflections. At this point
+I started noticing how optimizing ray marching could give numerical
+instability, especially when estimating the normals of a \emph{sinc} wave
+for lighting purposes. This is a weakness with ray marching, as we
+have to estimate the normal, as opposed to it being passed into the
+rendering pipeline.
 \\\\
 Another important effect to add when working with water is
 refraction. Water is colorless (i.e. transparent), so we should be
@@ -181,13 +197,18 @@ looks to be flowing in the pseudorandom motion water does in reality.
 \section*{Realistically colored realistic waves}
 \label{sec-10}
 \label{sec:realisticcolor}
-Our waves still look like plastic, much due to the specular shading
-from the lighting, and the fact that the water still has intrinsic
-color. Now, let's set the default color of water to \verb~0.00, 0.00, 0.04~, to resemble the darkness below, and make sure we only color the
-water by the color of the reflected sky. If we also lay a sheet of
-rain on the screen according to the noise texture, as well as
-spreading some splashes on the water surface in a random manner, we
-are starting to get something that looks like \hyperref[fig:okwater]{real water}.
+Our waves still look like plastic, much due to a weakness with the
+specular shading from the phong lighting, and the fact that the water
+still has intrinsic color. Now, let's set the default color of water
+to \verb~0.00, 0.00, 0.04~, to resemble the darkness below, and make sure
+we only color the water by the color of the reflected sky. If we also
+lay a sheet of rain on the screen according to the noise texture, as
+well as spreading some splashes on the water surface in a random
+manner, we are starting to get something that looks like \hyperref[fig:okwater]{real
+water}. At this point I was starting to notice one of the major
+disadvantages of ray marching: the performance. Rendering on my
+laptop, which has an integrated graphics card, required me to lower
+the resolution to 512x256.
 
 \section*{Further incremental improvements}
 \label{sec-11}
@@ -210,7 +231,9 @@ common in shaders. For this project I used FFTW to do an STFT over a
 \url{https://www.youtube.com/watch?v=WeIIrFhrePE}), and set the sphere in
 the scene to visualize the lower frequencies of the song (<
 30Hz). This creates an effect of the sphere expanding on the onset of
-bass notes, especially the kick drum.
+bass notes, especially the kick drum. When expanding the sphere we
+also see a problem with wrapping a square texture around a sphere --
+the poles stretch a lot.
 
 \section*{A finishing touch}
 \label{sec-13}
@@ -220,26 +243,21 @@ periscope that would float across the scene. This is done by combining
 two cylinders with an elongated torus to create the pipes and
 window. They are combined together with a smooth union. The pipes are
 made reflective, which looks fairly good, but a more matte, rusty
-surface might make it look less out of place. The final scene can be
-seen in \hyperref[fig:finalscene]{this} screenshot, or in !!this!! video that I've uploaded
-to YouTube.
-
-
-\section*{Restrictions}
-\label{sec-14}
-\begin{itemize}
-\item water looks like plastic with phong
-\item numerical accuracy
-\item glsl fucking sucks, stupid DSL
-\item mapping a texture around a sphere >:(
-\item its hard to make good stuff, time consuming
-\item still pretty slow to trace every pixel
-\end{itemize}
-
+surface might make it look less out of place. By doing this modelling
+by hand with SDFs, I got to feel how cumbersome this process is. There
+is a reason we have modelling tools, but I still have an immense
+amount of respect for the demo scene that creates these models
+procedurally. The final scene can be seen in \hyperref[fig:finalscene]{this} screenshot, or in a
+video that I've uploaded to YouTube
+(\url{https://www.youtube.com/watch?v=hDzagq61y1U}). The periscope is
+visible from about 8 seconds into the video. YouTube really did a
+number on the quality, so the full quality version is available at
+\url{http://folk.ntnu.no/thomaav/graphics/shader.mp4} (recommended version
+-- try with VLC or Chrome, the new Firefox wouldn't play the file).
 
 $\pagebreak$
 \section*{Appendix A - Images}
-\label{sec-15}
+\label{sec-14}
 \begin{figure}[htb]
 \centering
 \includegraphics[width=0.51\textwidth]{./img/simplesphere.png}
@@ -303,7 +321,7 @@ $\pagebreak$
 \begin{figure}[htb]
 \centering
 \includegraphics[width=0.99\textwidth]{./img/finalscene.png}
-\caption*{\label{fig:finalscene}The final scene -- with the periscope visible in the lower right. The video is found at YOUTUBE LINK. \hyperref[sec:periscope]{Back to section}.}
+\caption*{\label{fig:finalscene}The final scene -- with the periscope visible in the lower right. The video is found at \url{https://www.youtube.com/watch?v=hDzagq61y1U} or \url{http://folk.ntnu.no/thomaav/graphics/shader.mp4}. \hyperref[sec:periscope]{Back to section}.}
 \end{figure}
 % Emacs 25.2.2 (Org mode 8.2.10)
 \end{document}

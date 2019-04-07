@@ -11,11 +11,12 @@
 
 * Introduction
 I've been interested in the world of ray marching for a while, in
-particular the fantastic work of Inigo Quilez (found at
-https://iquilezles.org/www/index.htm). His blog explains an enormous
-amount of techniques to create unbelievable procedural scenes, using
-only a fragment shader. Most of these shaders are hosted at
-Shadertoy.com, which is an online tool for sharing shaders with WebGL.
+particular the fantastic work of Inigo Quilez (found [[https://iquilezles.org/www/index.htm][here]]). His blog
+explains an enormous amount of techniques to create unbelievable
+procedural scenes, using only a fragment shader. Most of these shaders
+are hosted at Shadertoy.com, which is an online tool for sharing
+shaders with WebGL. Code from other shaders I have been inspired by
+are all credited in comments in the source code.
 \\\\
 My primary goal for this project thus became to create interesting
 fragment shaders. This means that the only thing I'm allowed to pass
@@ -45,12 +46,11 @@ out of the box.
 Now -- what is this ray marching thing? In the world of /ray casting/,
 it is common to be familiar with /ray tracing/ to compute the
 intersections of a light ray with surfaces. /Ray marching/ may be used
-within such a ray tracing method, as it is a specific algorithm where
-samples are taken along the direction of a ray to test for this
-intersection. Using ray marching in combination with something that's
-called /signed distance functions/ can make extraordinary
-scenes from infinitesimal binary executables, as all that's required
-are the underlying mathematical formulas.
+within such a ray tracing method, as it is a specific algorithm for
+this purpose. Using ray marching in combination with something that's
+called /signed distance functions/ can make extraordinary scenes from
+infinitesimal binary executables, as all that's required are the
+underlying mathematical formulas.
 \\\\
 A signed distance function, let's say a sphere centered at the origin,
 $f(x, y, z) = \sqrt{x^2 + y^2 + z^2} - 1$, for this example, can be
@@ -60,16 +60,10 @@ contrast to more well known ray tracing implementations that have to
 check for intersections with quite a lot of primitives (like
 triangles).
 \\\\
-It's time for an example. In ~simple.frag~, there is a function,
-~sd_sphere~, that takes a point and a radius as arguments. Given this
-point, the function will return the distance from a point ~p~ to a
-sphere of radius ~r~ centered at the origin (the sphere can be
-translated by translating ~p~). We can leverage this to draw the
-sphere by sending out rays from our camera position, and iteratively
-stepping forward by an amount equal to the closest object in the scene
-(not necessarily found in the same direction of which we are
-tracing). Below are two illustrations I have found to explain the
-method the best.
+It's time to explain the workings of the method. In ~simple.frag~,
+there is a function, ~sd_sphere~, that takes a point and a radius as
+arguments, and returns the distance to its perimeter. Below are two
+illustrations I have found to explain the method the best.
 \\\\
 #+ATTR_LATEX: :width 0.45\textwidth
 [[./img/raytrace.png]]
@@ -77,20 +71,18 @@ $\hspace{35pt}$
 #+ATTR_LATEX: :width 0.45\textwidth
 [[./img/sphere_tracing.jpg]]
 \\\\
-The left image (http://jamie-wong.com/images/16-07-11/raytrace.png),
-shows how rays are traced from a camera. The right image
-(http://hugi.scene.org/online/hugi37/sphere_tracing.jpg), illustrates
-how the iterative steps are taken by the ray marching algorithm
-according to the distance to the object closest to the current point.
+The [[http://jamie-wong.com/images/16-07-11/raytrace.png][left]] image shows how rays are traced from a camera. The [[http://hugi.scene.org/online/hugi37/sphere_tracing.jpg][right]]
+image illustrates how the iterative steps are taken by the ray
+marching algorithm according to the distance to the object closest to
+the current point.
 
 * Humble beginnings
 <<sec:beginnings>>
-Let's put our new knowledge to the test -- the execution of the ray
+Let's put our new knowledge to a test -- the execution of the ray
 marching algorithm is found in any of the ~trace_<object>~
 functions. A simple rendering of a sphere with some simple phong
 shading is shown in [[fig:simplesphere][this image]]. Spheres are just the beginning; we
-have SDFs for a wide range of shapes:
-https://iquilezles.org/www/articles/distfunctions/distfunctions.htm.
+have SDFs for a wide range of shapes: [[https://iquilezles.org/www/articles/distfunctions/distfunctions.htm][link]].
 
 * Setting the stage
 <<sec:creatingascene>>
@@ -98,13 +90,14 @@ So we have a method of rendering a single object, in this case a
 sphere. How do we go about turning this into a complex scene? The
 first trick we will pull out of our sleeve is intersections and
 unions. If we compute the distance to more than one object, and then
-do ~max~ (intersect) or ~min~ between them, we can have multiple
-objects in our scene. The technique can be seen in action [[fig:union][here]]. A
-problem I encountered at this stage was using GLSL effictively. I
-practically gave up on optimization, but most of all I was missing the
-ability to pass around function pointers for distance functions (which
-could perhaps be done with ~switch~ statements anyway, as I'm already
-murdering the performance with all the conditionals).
+do ~max~ (intersect) or ~min~ (union) between them, we can have
+multiple objects in our scene. The technique can be seen in action
+[[fig:union][here]]. A problem I encountered at this stage was using GLSL
+effictively. I practically gave up on optimization, but most of all I
+was missing the ability to pass around function pointers for distance
+functions (which could perhaps be done with ~switch~ statements
+anyway, as I'm already murdering the performance with all the
+conditionals).
 
 * Shadows
 <<sec:shadows>> An advantage of signed distance functions is that they
@@ -113,7 +106,7 @@ scene, we can fairly easily explore our surroundings -- we just have
 to recalculate the SDF with new points. For shadowing, we simply
 follow what's called a /shadow ray/ from the surface point towards the
 position of a given light. If it intersects some other object on the
-way, the ligmht will not contribute to the illumination. We can also
+way, the light will not contribute to the illumination. We can also
 put areas that are /almost/ within the shadow under penumbra by
 checking how close we are to intersecting objects on the
 way. [[fig:penumbra][Illustration]]. This perhaps the most pressing advantage of ray
@@ -186,43 +179,40 @@ the resolution to 512x256.
 <<sec:furtherimprovements>>
 Now we add some clouds to the sky, by simply sampling our noise
 texture again, such that we can see the horizon in the distance. Then
-we add some lightning such that the scene lights up at random
-intervals. Then we make the sphere into something that looks like a
-planet with lava by sampling another texture suited for this purpose
-(however, it is still procedurally generated). [[fig:improvements][We're getting
-somewhere]].
+we add some lightning so the scene lights up at random intervals. Then
+we make the sphere into something that looks like a planet with lava
+by sampling another texture suited for this purpose (however, it is
+still procedurally generated). [[fig:improvements][We're getting somewhere]].
 
 * Sound and a Fast Fourier Transform
 <<sec:sound>>
 The CPU is mostly idling between the rendering of frames, but we can
 do something about this. Usage of a Fast Fourier Transform is very
 common in shaders. For this project I used FFTW to do an STFT over a
-.wav file of music (stolen from
-https://www.youtube.com/watch?v=WeIIrFhrePE), and set the sphere in
-the scene to visualize the lower frequencies of the song (<
-30Hz). This creates an effect of the sphere expanding on the onset of
-bass notes, especially the kick drum. When expanding the sphere we
-also see a problem with wrapping a square texture around a sphere --
-the poles stretch a lot.
+.wav file of music (stolen from [[https://www.youtube.com/watch?v%3DWeIIrFhrePE][YouTube]]), and set the sphere in the
+scene to visualize the lower frequencies of the song (< 30Hz). This
+creates an effect of the sphere expanding on the onset of bass notes,
+especially the kick drum. When expanding the sphere we also see a
+problem with wrapping a square texture around a sphere -- the poles
+stretch a lot.
 
 * A finishing touch
 <<sec:periscope>>
 To finish the scene, I decided to combine some SDFs to create a
 periscope that would float across the scene. This is done by combining
 two cylinders with an elongated torus to create the pipes and
-window. They are combined together with a smooth union. The pipes are
+window. They are combined with a smooth union. The pipes are
 made reflective, which looks fairly good, but a more matte, rusty
 surface might make it look less out of place. By doing this modelling
 by hand with SDFs, I got to feel how cumbersome this process is. There
 is a reason we have modelling tools, but I still have an immense
 amount of respect for the demo scene that creates these models
 procedurally. The final scene can be seen in [[fig:finalscene][this]] screenshot, or in a
-video that I've uploaded to YouTube
-(https://www.youtube.com/watch?v=hDzagq61y1U). The periscope is
-visible from about 8 seconds into the video. YouTube really did a
-number on the quality, so the full quality version is available at
-http://folk.ntnu.no/thomaav/graphics/shader.mp4 (recommended version
--- try with VLC or Chrome, the new Firefox wouldn't play the file).
+video that I've uploaded to [[https://www.youtube.com/watch?v%3DhDzagq61y1U][YouTube]] The periscope is visible from
+about 8 seconds into the video. YouTube really did a number on the
+quality, so the full quality version is available [[http://folk.ntnu.no/thomaav/graphics/shader.mp4][here]] (recommended
+version -- try with VLC or Chrome, the new Firefox wouldn't play the
+file).
 
 $\pagebreak$
 * Hide figure numbeirng :noexport:

@@ -1,4 +1,4 @@
-% Created 2019-04-07 Sun 16:38
+% Created 2019-04-07 Sun 20:19
 \documentclass[abstract=off,oneside]{scrreprt}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -109,8 +109,8 @@ according to the distance to the object closest to the current point.
 Let's put our new knowledge to the test -- the execution of the ray
 marching algorithm is found in any of the \verb~trace_<object>~
 functions. A simple rendering of a sphere with some simple phong
-shading is shown in \hyperref[fig:simplesphere]{this image}. Spheres are just the beginning, there
-exists SDFs for a wide range of shapes:
+shading is shown in \hyperref[fig:simplesphere]{this image}. Spheres are just the beginning; we
+have SDFs for a wide range of shapes:
 \url{https://iquilezles.org/www/articles/distfunctions/distfunctions.htm}.
 
 \section*{Setting the stage}
@@ -136,33 +136,119 @@ not contribute to the illumination. We can also put areas that are
 \emph{almost} within the shadow under penumbra by checking how close we are
 to intersecting objects on the way. \hyperref[fig:penumbra]{Illustration}.
 
-\section*{Sound and a Fast Fourier Transform}
+\section*{Ambient occlusion}
 \label{sec-7}
-No shader is complete without its fft
+\label{sec:ao}
+So the shadowing in the previous section looks quite good, but the
+ambient lighting looks a little flat. We can get fake, fast ambient
+occlusion in a fairly simple manner: evaluate the distance function at
+a few points around the actual point we are shading. By comparing the
+results of the scene SDF at these points to the original point, we
+gain information about the proximity of other surfaces around us, and
+with this information we can make an educated guess on the occlusion
+of the surface we are \hyperref[fig:ao]{shading}.
+
+\section*{Reflection and refraction}
+\label{sec-8}
+\label{sec:water}
+Water is for many the first thing to try out when learning shading,
+and this is no exception. Planes can easily be represented as SDFs
+with a single height value, and wave-like displacements can be added
+with a simple sine, as can be seen \hyperref[fig:simplewater]{here}. Adding reflection is no
+harder than adding shadows -- we simply march again from points of
+intersection in a reflected direction, and mix the reflection color
+with the reflective surface color (\hyperref[fig:reflection]{example}). We also add a fresnel
+effect such that steeper angles give weaker reflections.
+\\\\
+Another important effect to add when working with water is
+refraction. Water is colorless (i.e. transparent), so we should be
+able to see the sphere when it's underwater. Refraction is similar to
+reflection in that we do another ray march, but this time we first
+bend the ray according to the refractive index of water, giving
+\hyperref[fig:refraction]{this} effect.
+
+\section*{Realistic waves}
+\label{sec-9}
+\label{sec:realisticwaves}
+So we might be tempted to say that the effects above make a pretty
+cool shader, but we can do much better: time for a noise texture and
+fractal Brownian motion. Explanations of these methods are slightly
+too complicated to fit into four pages, but the implementation
+contains comments on the workings, as well as links to further
+readings. The \hyperref[fig:noise]{effect} of adding this noise is moving water that
+looks to be flowing in the pseudorandom motion water does in reality.
+
+\section*{Realistically colored realistic waves}
+\label{sec-10}
+\label{sec:realisticcolor}
+Our waves still look like plastic, much due to the specular shading
+from the lighting, and the fact that the water still has intrinsic
+color. Now, let's set the default color of water to \verb~0.00, 0.00, 0.04~, to resemble the darkness below, and make sure we only color the
+water by the color of the reflected sky. If we also lay a sheet of
+rain on the screen according to the noise texture, as well as
+spreading some splashes on the water surface in a random manner, we
+are starting to get something that looks like \hyperref[fig:okwater]{real water}.
+
+\section*{Further incremental improvements}
+\label{sec-11}
+\label{sec:furtherimprovements}
+Now we add some clouds to the sky, by simply sampling our noise
+texture again, such that we can see the horizon in the distance. Then
+we add some lightning such that the scene lights up at random
+intervals. Then we make the sphere into something that looks like a
+planet with lava by sampling another texture suited for this purpose
+(however, it is still procedurally generated). \hyperref[fig:improvements]{We're getting
+somewhere}.
+
+\section*{Sound and a Fast Fourier Transform}
+\label{sec-12}
+\label{sec:sound}
+The CPU is mostly idling between the rendering of frames, but we can
+do something about this. Usage of a Fast Fourier Transform is very
+common in shaders. For this project I used FFTW to do an STFT over a
+.wav file of music (stolen from
+\url{https://www.youtube.com/watch?v=WeIIrFhrePE}), and set the sphere in
+the scene to visualize the lower frequencies of the song (<
+30Hz). This creates an effect of the sphere expanding on the onset of
+bass notes, especially the kick drum.
+
+\section*{A finishing touch}
+\label{sec-13}
+\label{sec:periscope}
+To finish the scene, I decided to combine some SDFs to create a
+periscope that would float across the scene. This is done by combining
+two cylinders with an elongated torus to create the pipes and
+window. They are combined together with a smooth union. The pipes are
+made reflective, which looks fairly good, but a more matte, rusty
+surface might make it look less out of place. The final scene can be
+seen in \hyperref[fig:finalscene]{this} screenshot, or in !!this!! video that I've uploaded
+to YouTube.
 
 
 \section*{Restrictions}
-\label{sec-8}
+\label{sec-14}
 \begin{itemize}
 \item water looks like plastic with phong
 \item numerical accuracy
 \item glsl fucking sucks, stupid DSL
 \item mapping a texture around a sphere >:(
+\item its hard to make good stuff, time consuming
+\item still pretty slow to trace every pixel
 \end{itemize}
 
 
 $\pagebreak$
 \section*{Appendix A - Images}
-\label{sec-9}
+\label{sec-15}
 \begin{figure}[htb]
 \centering
-\includegraphics[width=0.70\textwidth]{./img/simplesphere.png}
+\includegraphics[width=0.51\textwidth]{./img/simplesphere.png}
 \caption*{\label{fig:simplesphere}A simple ray marched sphere. \hyperref[sec:beginnings]{Back to section.}}
 \end{figure}
 
 \begin{figure}[htb]
 \centering
-\includegraphics[width=0.70\textwidth]{./img/union.png}
+\includegraphics[width=0.51\textwidth]{./img/union.png}
 \caption*{\label{fig:union}The union between a sphere and a cube. \hyperref[sec:creatingascene]{Back to section.}}
 \end{figure}
 
@@ -170,6 +256,54 @@ $\pagebreak$
 \centering
 \includegraphics[width=0.99\textwidth]{./img/penumbra.png}
 \caption*{\label{fig:penumbra}Penumbra shadowing in action. The left image has a \verb~k~-value of only 2, while the right image has a value of 128. \hyperref[sec:shadows]{Back to section.}}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/ao.png}
+\caption*{\label{fig:ao}Ambient occlusion. Notice how some edges of the box are occluded by the floor. \hyperref[sec:ao]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/simplewater.png}
+\caption*{\label{fig:simplewater}Very simple water shader in action, a gif can be found here: \url{http://folk.ntnu.no/thomaav/graphics/simplewater.gif}. \hyperref[sec:water]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/reflection.png}
+\caption*{\label{fig:reflection}Reflection on the water surface, gif found at: \url{http://folk.ntnu.no/thomaav/graphics/reflection.gif}. \hyperref[sec:water]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/refraction.png}
+\caption*{\label{fig:refraction}Refractive water surface. \url{http://folk.ntnu.no/thomaav/graphics/refraction.gif}. \hyperref[sec:water]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/noise.png}
+\caption*{\label{fig:noise}Water surface that is displaced with fBm. \url{http://folk.ntnu.no/thomaav/graphics/noise.gif}. \hyperref[sec:realisticwaves]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/okwater.png}
+\caption*{\label{fig:okwater}More realistic coloring of the water. \url{http://folk.ntnu.no/thomaav/graphics/okwater.gif}. \hyperref[sec:realisticcolor]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/improvements.png}
+\caption*{\label{fig:improvements}Further improvements on the scene. Includes procedurally texturing the sphere and adding clouds and lightning. \hyperref[sec:furtherimprovements]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/finalscene.png}
+\caption*{\label{fig:finalscene}The final scene -- with the periscope visible in the lower right. The video is found at YOUTUBE LINK. \hyperref[sec:periscope]{Back to section}.}
 \end{figure}
 % Emacs 25.2.2 (Org mode 8.2.10)
 \end{document}

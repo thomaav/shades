@@ -202,7 +202,7 @@ float sd_plane(vec3 p)
 // amplitude output from an FFT.
 float sphere_radius()
 {
-    if (bass_amplitude < 0)
+    if (bass_amplitude <= 0)
         return 0.90;
 
     return 0.45 + normalize_range(60.0f, 120.0f, 0.0f, 0.2f, bass_amplitude);
@@ -445,17 +445,33 @@ vec3 est_sphere_normal(vec3 p, float r)
     ));
 }
 
+// Ambient occlusion information:
 // http://delivery.acm.org/10.1145/1190000/1185834/p153-evans.pdf?ip=129.241.110.156&id=1185834&acc=ACTIVE%20SERVICE&key=CDADA77FFDD8BE08%2E5386D6A7D247483C%2E4D4702B0C3E38B35%2E4D4702B0C3E38B35&__acm__=1552050912_e7cfd8c9dad8342ae20b52e0aeabbaf2
 // http://www.iquilezles.org/www/material/nvscene2008/rwwtt.pdf
+
+// We can do fake and fast AO very cheaply. We evaluate the distance
+// function a few points around <pos>, and compare these new distances
+// to the original distance to <pos>. By doing this, we gain
+// information about the proximity of other surfaces around us, and
+// with this information we can make an educated guess on the
+// occlusion of a point on a surface.
 float ambient_occlusion(vec3 pos, vec3 normal)
 {
     float occ = 0.0f;
     float sca = 1.0f;
 
     for (int i = 0; i < 5; ++i) {
-        float h = 0.001 + 0.15*float(i)/4.0f;
-        float d = sd_scene(pos + h*normal);
-        occ += (h-d)*sca;
+        // Step away from the point along the normal.
+        float step_length = 0.001 + 0.15*float(i)/4.0f;
+        float new_dist = sd_scene(pos + step_length*normal);
+
+        // h-d is 0 if the distance from the surface is the same as
+        // how much we've stepped. Otherwise there is some other
+        // object that is closer, that may be occluding the surface.
+        occ += (step_length-new_dist)*sca;
+
+        // Exponential decay, such that surfaces that are farther away
+        // occlude the surface less than close ones.
         sca *= 0.95;
     }
 
@@ -683,7 +699,7 @@ vec4 shade_scene()
                                       p_plane, eye, underwater_color,
                                       n_plane), 1.0f);
 
-        #ifdef REFRACTION
+        #ifdef REFRACTION 
         float raydotn = dot(ray_dir, n_plane);
         vec3 refr_ray = normalize(ray_dir + (-cos(1.10*acos(-raydotn))-raydotn)*n_plane);
         float refr_dist_sphere = trace_sphere(p_plane, refr_ray, MIN_DIST, MAX_DIST);

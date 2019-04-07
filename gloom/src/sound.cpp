@@ -19,7 +19,7 @@ void print_devices()
     ALCchar *device = devices;
     size_t len = 0;
 
-    std::cout << "Devices:" << std::endl;
+    std::cout << "Sound devices available:" << std::endl;
     while (device && *device != '\0' && next && *next != '\0') {
         std::cout << "  " << device << std::endl;
         len = strlen(device);
@@ -31,6 +31,8 @@ void print_devices()
 // http://www.david-amador.com/2011/06/playing-sound-using-openal/
 void playWAV(const char *fp, std::future<bool> &&stop)
 {
+    print_devices();
+
     // We need to initialize an OpenAL context to use to play
     // sound. This is very similar to what we do with OpenGL.
     ALCcontext *context;

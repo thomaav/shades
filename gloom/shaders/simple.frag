@@ -202,6 +202,9 @@ float sd_plane(vec3 p)
 // amplitude output from an FFT.
 float sphere_radius()
 {
+    if (bass_amplitude < 0)
+        return 0.90;
+
     return 0.45 + normalize_range(60.0f, 120.0f, 0.0f, 0.2f, bass_amplitude);
 }
 

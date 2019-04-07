@@ -462,20 +462,28 @@ float ambient_occlusion(vec3 pos, vec3 normal)
     return clamp(1.0f - 1.5f*occ, 0.0f, 1.0f);
 }
 
-float penumbra_shadow(vec3 ro, vec3 rd, float mint, float maxt, float k)
+// Shadowing is very easy with SDFs, as they contain global
+// information about the scene. We simply track a shadow ray from the
+// point we found along the light direction, and check whether it
+// intersects some other object in the scene.
+float penumbra_shadow(vec3 p, vec3 ray_dir, float start, float end, float k)
 {
-    float EPSILON = 0.0001;
-    float res = 1.0f;
+    float EPSILON = 0.001;
+    float shadow_color = 1.0f;
 
-    for (float t = mint; t < maxt;) {
-        float h = sd_scene(ro + rd*t);
+    for (float t = start; t < end;) {
+        float h = sd_scene(p + ray_dir*t);
         if (h < EPSILON)
             return 0.0f;
-        res = min(res, k*h/t);
+
+        // We want to put areas that are _almost_ within the shadow
+        // under penumbra.
+        shadow_color = min(shadow_color, k*h/t);
+
         t += h;
     }
 
-    return res;
+    return shadow_color;
 }
 
 vec3 phong_light_contrib(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye,

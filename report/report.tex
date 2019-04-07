@@ -1,4 +1,4 @@
-% Created 2019-04-07 Sun 15:50
+% Created 2019-04-07 Sun 16:38
 \documentclass[abstract=off,oneside]{scrreprt}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -82,7 +82,7 @@ contrast to more well known ray tracing implementations that have to
 check for intersections with quite a lot of primitives (like
 triangles).
 \\\\
-Time for an example. In \verb~simple.frag~, there is a function,
+It's time for an example. In \verb~simple.frag~, there is a function,
 \verb~sd_sphere~, that takes a point and a radius as arguments. Given this
 point, the function will return the distance from a point \verb~p~ to a
 sphere of radius \verb~r~ centered at the origin (the sphere can be
@@ -109,15 +109,40 @@ according to the distance to the object closest to the current point.
 Let's put our new knowledge to the test -- the execution of the ray
 marching algorithm is found in any of the \verb~trace_<object>~
 functions. A simple rendering of a sphere with some simple phong
-shading is shown in \hyperref[fig:simplesphere]{this image}.
+shading is shown in \hyperref[fig:simplesphere]{this image}. Spheres are just the beginning, there
+exists SDFs for a wide range of shapes:
+\url{https://iquilezles.org/www/articles/distfunctions/distfunctions.htm}.
+
+\section*{Setting the stage}
+\label{sec-5}
+\label{sec:creatingascene}
+So we have a method of rendering a single object, in this case a
+sphere. How do we go about turning this into a complex scene? The
+first trick we will pull out of our sleeve is intersections and
+unions. If we compute the distance to more than one object, and then
+do \verb~max~ (intersect) or \verb~min~ between them, we can have multiple
+objects in our scene. The technique can be seen in action \hyperref[fig:union]{here}.
+
+\section*{Shadows}
+\label{sec-6}
+\label{sec:shadows}
+An advantage of signed distance functions is that they provide us with
+global information. Given a point on a surface in a scene, we can
+fairly easily explore our surroundings -- we just have to recalculate
+the SDF with new points. For shadowing, we simply follow what's called
+a \emph{shadow ray} from the surface point towards the position of a given
+light. If it intersects some other object on the way, the light will
+not contribute to the illumination. We can also put areas that are
+\emph{almost} within the shadow under penumbra by checking how close we are
+to intersecting objects on the way. \hyperref[fig:penumbra]{Illustration}.
 
 \section*{Sound and a Fast Fourier Transform}
-\label{sec-5}
+\label{sec-7}
 No shader is complete without its fft
 
 
 \section*{Restrictions}
-\label{sec-6}
+\label{sec-8}
 \begin{itemize}
 \item water looks like plastic with phong
 \item numerical accuracy
@@ -126,13 +151,25 @@ No shader is complete without its fft
 \end{itemize}
 
 
+$\pagebreak$
 \section*{Appendix A - Images}
-\label{sec-7}
-
+\label{sec-9}
 \begin{figure}[htb]
 \centering
 \includegraphics[width=0.70\textwidth]{./img/simplesphere.png}
 \caption*{\label{fig:simplesphere}A simple ray marched sphere. \hyperref[sec:beginnings]{Back to section.}}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.70\textwidth]{./img/union.png}
+\caption*{\label{fig:union}The union between a sphere and a cube. \hyperref[sec:creatingascene]{Back to section.}}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/penumbra.png}
+\caption*{\label{fig:penumbra}Penumbra shadowing in action. The left image has a \verb~k~-value of only 2, while the right image has a value of 128. \hyperref[sec:shadows]{Back to section.}}
 \end{figure}
 % Emacs 25.2.2 (Org mode 8.2.10)
 \end{document}

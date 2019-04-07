@@ -59,7 +59,7 @@ contrast to more well known ray tracing implementations that have to
 check for intersections with quite a lot of primitives (like
 triangles).
 \\\\
-Time for an example. In ~simple.frag~, there is a function,
+It's time for an example. In ~simple.frag~, there is a function,
 ~sd_sphere~, that takes a point and a radius as arguments. Given this
 point, the function will return the distance from a point ~p~ to a
 sphere of radius ~r~ centered at the origin (the sphere can be
@@ -87,15 +87,35 @@ according to the distance to the object closest to the current point.
 Let's put our new knowledge to the test -- the execution of the ray
 marching algorithm is found in any of the ~trace_<object>~
 functions. A simple rendering of a sphere with some simple phong
-shading is shown in [[fig:simplesphere][this image]].
+shading is shown in [[fig:simplesphere][this image]]. Spheres are just the beginning; we
+have SDFs for a wide range of shapes:
+https://iquilezles.org/www/articles/distfunctions/distfunctions.htm.
 
-* Creating a scene
+* Setting the stage
+<<sec:creatingascene>>
 So we have a method of rendering a single object, in this case a
 sphere. How do we go about turning this into a complex scene? The
 first trick we will pull out of our sleeve is intersections and
 unions. If we compute the distance to more than one object, and then
 do ~max~ (intersect) or ~min~ between them, we can have multiple
-objects in our scene. Check this out.
+objects in our scene. The technique can be seen in action [[fig:union][here]].
+
+* Shadows
+<<sec:shadows>>
+An advantage of signed distance functions is that they provide us with
+global information. Given a point on a surface in a scene, we can
+fairly easily explore our surroundings -- we just have to recalculate
+the SDF with new points. For shadowing, we simply follow what's called
+a /shadow ray/ from the surface point towards the position of a given
+light. If it intersects some other object on the way, the light will
+not contribute to the illumination. We can also put areas that are
+/almost/ within the shadow under penumbra by checking how close we are
+to intersecting objects on the way. [[fig:penumbra][Illustration]].
+
+* Ambient occlusion
+<<sec:ao>>
+So the shadowing in the previous section looks quite good, but lacks
+ambient occlusion.
 
 * Sound and a Fast Fourier Transform
 No shader is complete without its fft
@@ -108,6 +128,7 @@ No shader is complete without its fft
 - mapping a texture around a sphere >:(
 
 
+$\pagebreak$
 * Hide figure numbeirng :noexport:
 #+BEGIN_SRC emacs_lisp
  (require 'ox)
@@ -119,10 +140,18 @@ No shader is complete without its fft
  (add-to-list 'org-export-filter-final-output-functions #'remove-figure-numbering)
 #+END_SRC
 
-\pagebreak
 * Appendix A - Images
-
 #+CAPTION: A simple ray marched sphere. [[sec:beginnings][Back to section.]]
 #+NAME: fig:simplesphere
 #+ATTR_LATEX: :width 0.70\textwidth
 [[./img/simplesphere.png]]
+
+#+CAPTION: The union between a sphere and a cube. [[sec:creatingascene][Back to section.]]
+#+NAME: fig:union
+#+ATTR_LATEX: :width 0.70\textwidth
+[[./img/union.png]]
+
+#+CAPTION: Penumbra shadowing in action. The left image has a ~k~-value of only 2, while the right image has a value of 128. [[sec:shadows][Back to section.]]
+#+NAME: fig:penumbra
+#+ATTR_LATEX: :width 0.99\textwidth
+[[./img/penumbra.png]]

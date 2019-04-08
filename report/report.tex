@@ -1,4 +1,4 @@
-% Created 2019-04-08 Mon 13:32
+% Created 2019-04-08 Mon 14:12
 \documentclass[abstract=off,oneside]{scrreprt}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -56,14 +56,13 @@ GitHub\footnote{\url{https://github.com/thomaav/graphics}}, as this has been tes
 
 \section*{Ray Marching}
 \label{sec-3}
-Now -- what is this ray marching thing? In the world of \emph{ray casting},
-it is common to be familiar with \emph{ray tracing} to compute the
-intersections of a light ray with surfaces. \emph{Ray marching} may be used
-within such a ray tracing method, as it is a specific algorithm for
-this purpose. Using ray marching in combination with something that's
-called \emph{signed distance functions} can make extraordinary scenes from
-infinitesimal binary executables, as all that's required are the
-underlying mathematical formulas.
+In the world of \emph{ray casting}, it is common to be familiar with \emph{ray
+tracing} to compute the intersections of a light ray with
+surfaces. \emph{Ray marching} may be used within such a ray tracing method,
+as it is a specific algorithm for this purpose. Using ray marching in
+combination with something that's called \emph{signed distance functions}
+can make extraordinary scenes from infinitesimal binary executables,
+as all that's required are the underlying mathematical formulas.
 \\\\
 A signed distance function, let's say a sphere centered at the origin,
 $f(x, y, z) = \sqrt{x^2 + y^2 + z^2} - 1$, can be used to determine
@@ -99,17 +98,16 @@ a wide range of shapes\footnote{\url{https://iquilezles.org/www/articles/distfun
 \section*{Setting the stage}
 \label{sec-5}
 \label{sec:creatingascene}
-So we have a method of rendering a single sphere. How do we go about
-turning this into a complex scene? The first trick we will pull out of
-our sleeve is intersections and unions. If we compute the distance to
-more than one object, and then do \verb~max~ (intersect) or \verb~min~ (union)
-between them, we can have multiple objects in our scene. The technique
-can be seen in action \hyperref[fig:union]{here}. A problem I encountered at this stage was
-using GLSL effictively. I practically gave up on optimization, but
-most of all I was missing the ability to pass around function pointers
-for distance functions (which could perhaps be done with \verb~switch~
-statements anyway, as I'm already murdering the performance with
-conditionals).
+How do we go about turning this simple sphere into a complex scene?
+The first trick we will pull out of our sleeve is intersections and
+unions. If we compute the distance to more than one object, and then
+do \verb~max~ (intersect) or \verb~min~ (union) between them, we can have
+multiple objects in our scene. The technique can be seen in action
+\hyperref[fig:union]{here}. A problem I encountered at this stage was using GLSL
+effictively. I practically gave up on optimization, but most of all I
+was missing the ability to pass around function pointers for distance
+functions (which could perhaps be done with \verb~switch~ statements
+anyway, as I'm already murdering the performance with conditionals).
 
 \section*{Shadows}
 \label{sec-6}
@@ -122,24 +120,22 @@ position of a given light. If it intersects some other object on the
 way, the light will not contribute to the illumination. We can also
 put areas that are \emph{almost} within the shadow under penumbra by
 checking how close we are to intersecting objects on the
-way. \hyperref[fig:penumbra]{Illustration}. This perhaps the most pressing advantage of ray
-tracing in general: effects such as shadows and reflections are
-natural results of the algorithm.
+way. \hyperref[fig:penumbra]{Illustration}. This is a great advantage of ray tracing in
+general: effects such as shadows and reflections are natural results
+of the algorithm.
 
 \section*{Ambient occlusion}
 \label{sec-7}
 \label{sec:ao}
-So the shadowing in the previous section looks quite good, but the
-ambient lighting looks a little flat. We can get fake, fast ambient
-occlusion in a fairly simple manner: evaluate the distance function at
-a few points around the actual point we are shading. By comparing the
-results of the scene SDF at these points to the original point, we
-gain information about the proximity of other surfaces around us, and
-with this information we can make an educated guess on the occlusion
-of the surface we are \hyperref[fig:ao]{shading}. A limitation of this method is that
-it's a crude approximation, and may give results that seem \emph{off}
-(e.g. floor occluding \emph{a lot} of the light hitting the bottom of a
-wall).
+So the shadowing in the previous section looks a little flat. We can
+get fake, fast ambient occlusion in a fairly simple manner: evaluate
+the distance function at a few points around the actual point we are
+shading. By comparing the results of the scene SDF at these points to
+the original point, we gain information about the proximity of other
+surfaces around us, and with this information we can make an educated
+guess on the occlusion of the surface we are \hyperref[fig:ao]{shading}. A limitation of
+this method is that it's a crude approximation, and may give results
+that seem \emph{off} for tight spaces.
 
 \section*{Reflection and refraction}
 \label{sec-8}
@@ -185,9 +181,8 @@ rain on the screen according to the noise texture, as well as
 spreading some splashes on the water surface in a random manner. We
 are starting to get something that looks like \hyperref[fig:okwater]{real water}. At this
 point I was starting to notice one of the major disadvantages of ray
-marching: the performance. Rendering on my laptop, which has an
-integrated graphics card, required me to lower the resolution to
-512x256.
+marching: the performance. Rendering on my laptop required me to lower
+the resolution to 512x256.
 
 \section*{Further incremental improvements}
 \label{sec-11}
@@ -196,8 +191,8 @@ Now we add some clouds to the sky, by simply sampling our noise
 texture again, such that we can see the horizon in the distance. Then
 we add some lightning so the scene lights up at random intervals. Then
 we make the sphere into something that looks like a planet with lava
-by sampling another texture suited for this purpose (however, it is
-still procedurally generated). \hyperref[fig:improvements]{We're getting somewhere}.
+by sampling another texture suited for this purpose. \hyperref[fig:improvements]{We're getting
+somewhere}.
 
 \section*{Sound and a Fast Fourier Transform}
 \label{sec-12}
@@ -205,12 +200,10 @@ still procedurally generated). \hyperref[fig:improvements]{We're getting somewhe
 The CPU is mostly idling between the rendering of frames, but we can
 do something about this. Usage of a Fast Fourier Transform is very
 common in shaders. For this project I used FFTW to do an STFT over a
-.wav file of music (stolen from YouTube\footnote{\url{https://www.youtube.com/watch?v=WeIIrFhrePE}}), and set the sphere in the
-scene to visualize the lower frequencies of the song (< 30Hz). This
-creates an effect of the sphere expanding on the onset of bass notes,
-especially the kick drum. When expanding the sphere we also see a
-problem with wrapping a square texture around a sphere -- the poles
-stretch a lot.
+.wav-file\footnote{\url{https://www.youtube.com/watch?v=WeIIrFhrePE}}. This creates an effect of the sphere expanding on the
+onset of bass notes, especially the kick drum. When expanding the
+sphere we also see a problem with wrapping a square texture around a
+sphere -- the poles stretch a lot.
 
 \section*{A finishing touch}
 \label{sec-13}
@@ -218,18 +211,16 @@ stretch a lot.
 To finish the scene, I decided to combine some SDFs to create a
 periscope that would float across the scene. This is done by combining
 two cylinders with an elongated torus to create the pipes and
-window. They are combined with a smooth union. The pipes are
-made reflective, which looks fairly good, but a more matte, rusty
-surface might make it look less out of place. By doing this modelling
-by hand with SDFs, I got to feel how cumbersome this process is. There
-is a reason we have modelling tools, but I still have an immense
-amount of respect for the demo sceners that create these models
-procedurally. The final scene can be seen in \hyperref[fig:finalscene]{this} screenshot, or in a
-video that I've uploaded to YouTube\footnote{\url{https://www.youtube.com/watch?v=hDzagq61y1U}}. The periscope is visible from
-about 8 seconds into the video. YouTube really did a number on the
-quality, so the full quality version is available\footnote{\url{http://folk.ntnu.no/thomaav/graphics/shader.mp4}} (recommended
-version -- try with VLC or Chrome, the new Firefox wouldn't play the
-file).
+window. The pipes are made reflective, which looks fairly good, but a
+more matte, rusty surface might make it look less out of place. By
+doing this modelling by hand with SDFs, I got to feel how cumbersome
+the process is. There is a reason we have modelling tools, but I still
+have an immense amount of respect for the demo sceners that create
+these models procedurally. The final scene can be seen in \hyperref[fig:finalscene]{this}
+screenshot, or in a video that I've uploaded to YouTube\footnote{\url{https://www.youtube.com/watch?v=hDzagq61y1U}}. YouTube
+really did a number on the quality, so the full quality version is
+available\footnote{\url{http://folk.ntnu.no/thomaav/graphics/shader.mp4}} (recommended version -- try with VLC or Chrome, the
+new Firefox wouldn't play the file).
 
 $\pagebreak$
 \section*{Appendix A - Images}

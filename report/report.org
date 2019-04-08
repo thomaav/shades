@@ -11,36 +11,26 @@
 
 * Introduction
 I've been interested in the world of ray marching for a while, in
-particular the fantastic work of Inigo Quilez (found [[https://iquilezles.org/www/index.htm][here]]). His blog
-explains an enormous amount of techniques to create unbelievable
-procedural scenes, using only a fragment shader. Most of these shaders
-are hosted at Shadertoy.com, which is an online tool for sharing
-shaders with WebGL. Code from other shaders I have been inspired by
-are all credited in comments in the source code.
+particular the fantastic work of Inigo Quilez[fn:6]. His blog explains
+an enormous amount of techniques to create unbelievable procedural
+scenes. Most of these shaders are hosted at Shadertoy.com, which is an
+online tool for sharing shaders with WebGL. Code from other shaders I
+have been inspired by are all credited in comments in the source code.
 \\\\
 My primary goal for this project thus became to create interesting
-fragment shaders. This means that the only thing I'm allowed to pass
-into the vertex shader is a /single quad/ that covers the
-entire screen -- all the fragment shader has to work with is
-~gl_FragCoord~ (with some exceptions, more on that later).
-\\\\
-For this report I will go through the process step by step, from the
-baby steps required to render a simple sphere, to the final leaps that
-render a realistic looking scene. There are quite a few illustratory
-images, which reside in the appendix, with links back and forth to
-make the reading bearable. Limitations with the techniques, as well as
-problems encountered will be pointed out along the way.
+fragment shaders, primarily using ~gl_FragCoord~.  For this report I
+will go through the process step by step, from the baby steps required
+to render a simple sphere, to the final leaps that render a realistic
+looking scene. Limitations of the techniques, as well as problems
+encountered will be pointed out along the way.
 
 * Building the project
-The project uses CMake for the building process, as is required for
-the assignment. I've also taken the liberty of adding three libraries
-to use sound: OpenAL Soft , freealut and FFTW. OpenAL and freealut are
-added as submodules with Git, while FFTW is added as an external
-project in CMake, which fetches a tarball online, then extracts and
-builds the library. Building thus takes a little while, but it's not
-too painful. This has been tested with the package repositories found
-in Ubuntu 18.04 and Debian Stretch, and should hopefully work right
-out of the box.
+The project uses CMake (Gloom) for the building process, as is
+required for the assignment. I've also taken the liberty of adding
+three libraries to use sound: OpenAL Soft, freealut and FFTW. OpenAL
+and freealut are added as submodules with Git, while FFTW is added as
+an external project in CMake. I suggest pulling the repository from
+GitHub[fn:5], as this has been tested to work cleanly from scratch.
 
 * Ray Marching
 Now -- what is this ray marching thing? In the world of /ray casting/,
@@ -53,17 +43,17 @@ infinitesimal binary executables, as all that's required are the
 underlying mathematical formulas.
 \\\\
 A signed distance function, let's say a sphere centered at the origin,
-$f(x, y, z) = \sqrt{x^2 + y^2 + z^2} - 1$, for this example, can be
-used to determine whether a point is inside or outside an object, as
-well as the distance to the object if it is outside. This is in
-contrast to more well known ray tracing implementations that have to
-check for intersections with quite a lot of primitives (like
-triangles).
+$f(x, y, z) = \sqrt{x^2 + y^2 + z^2} - 1$, can be used to determine
+whether a point is inside or outside an object, as well as the
+distance to the object if it is outside. This is in contrast to more
+well known ray tracing implementations that have to check for
+intersections with quite a lot of primitives.
 \\\\
-It's time to explain the workings of the method. In ~simple.frag~,
-there is a function, ~sd_sphere~, that takes a point and a radius as
-arguments, and returns the distance to its perimeter. Below are two
-illustrations I have found to explain the method the best.
+So how does this work in practice? In ~simple.frag~, there is a
+function, ~sd_sphere~, that takes a point and a radius as arguments,
+and returns the distance to the sphere's perimeter. This is becoming
+interesting: below are two illustrations I have found to explain the
+further steps the best.
 \\\\
 #+ATTR_LATEX: :width 0.45\textwidth
 [[./img/raytrace.png]]
@@ -71,32 +61,31 @@ $\hspace{35pt}$
 #+ATTR_LATEX: :width 0.45\textwidth
 [[./img/sphere_tracing.jpg]]
 \\\\
-The [[http://jamie-wong.com/images/16-07-11/raytrace.png][left]] image shows how rays are traced from a camera. The [[http://hugi.scene.org/online/hugi37/sphere_tracing.jpg][right]]
-image illustrates how the iterative steps are taken by the ray
-marching algorithm according to the distance to the object closest to
-the current point.
+The left[fn:1] image shows how rays are traced from a camera. The
+right[fn:2] image illustrates how the iterative steps are taken by the
+ray marching algorithm according to the distance to the object closest
+to the current point.
 
 * Humble beginnings
 <<sec:beginnings>>
 Let's put our new knowledge to a test -- the execution of the ray
 marching algorithm is found in any of the ~trace_<object>~
-functions. A simple rendering of a sphere with some simple phong
-shading is shown in [[fig:simplesphere][this image]]. Spheres are just the beginning; we
-have SDFs for a wide range of shapes: [[https://iquilezles.org/www/articles/distfunctions/distfunctions.htm][link]].
+functions. A simple rendering of a sphere with some phong shading is
+shown in [[fig:simplesphere][this image]]. Spheres are just the beginning; we have SDFs for
+a wide range of shapes[fn:7].
 
 * Setting the stage
 <<sec:creatingascene>>
-So we have a method of rendering a single object, in this case a
-sphere. How do we go about turning this into a complex scene? The
-first trick we will pull out of our sleeve is intersections and
-unions. If we compute the distance to more than one object, and then
-do ~max~ (intersect) or ~min~ (union) between them, we can have
-multiple objects in our scene. The technique can be seen in action
-[[fig:union][here]]. A problem I encountered at this stage was using GLSL
-effictively. I practically gave up on optimization, but most of all I
-was missing the ability to pass around function pointers for distance
-functions (which could perhaps be done with ~switch~ statements
-anyway, as I'm already murdering the performance with all the
+So we have a method of rendering a single sphere. How do we go about
+turning this into a complex scene? The first trick we will pull out of
+our sleeve is intersections and unions. If we compute the distance to
+more than one object, and then do ~max~ (intersect) or ~min~ (union)
+between them, we can have multiple objects in our scene. The technique
+can be seen in action [[fig:union][here]]. A problem I encountered at this stage was
+using GLSL effictively. I practically gave up on optimization, but
+most of all I was missing the ability to pass around function pointers
+for distance functions (which could perhaps be done with ~switch~
+statements anyway, as I'm already murdering the performance with
 conditionals).
 
 * Shadows
@@ -129,26 +118,23 @@ wall).
 
 * Reflection and refraction
 <<sec:water>>
-Water is for many the first thing to try out when learning shading,
-and this is no exception. Planes can easily be represented as SDFs
-with a single height value, and wave-like displacements can be added
-with a simple sine, as can be seen [[fig:simplewater][here]]. Adding reflection is no
-harder than adding shadows -- we simply march again from points of
-intersection in a reflected direction, and mix the reflection color
-with the reflective surface color ([[fig:reflection][example]]). We also add a fresnel
-effect such that steeper angles give weaker reflections. At this point
-I started noticing how optimizing ray marching could give numerical
-instability, especially when estimating the normals of a /sinc/ wave
-for lighting purposes. This is a weakness with ray marching, as we
-have to estimate the normal, as opposed to it being passed into the
-rendering pipeline.
+Planes can easily be represented as SDFs with a single height value,
+and wave-like displacements can be added with a simple sine, as can be
+seen [[fig:simplewater][here]]. Adding reflection is no harder than adding shadows -- we
+simply march again from points of intersection in a reflected
+direction, and mix the reflection color with the reflective surface
+color ([[fig:reflection][example]]). We also add a fresnel effect such that steeper angles
+give weaker reflections. At this point I started noticing how
+optimizing ray marching could give numerical [[fig:instability][instability]], especially
+when estimating the normals of a [[fig:instability2][sinc wave]] for lighting purposes. This
+is a weakness with ray marching, as we have to estimate the normal, as
+opposed to it being passed into the rendering pipeline.
 \\\\
 Another important effect to add when working with water is
-refraction. Water is colorless (i.e. transparent), so we should be
-able to see the sphere when it's underwater. Refraction is similar to
-reflection in that we do another ray march, but this time we first
-bend the ray according to the refractive index of water, giving
-[[fig:refraction][this]] effect.
+refraction. Water is transparent, so we should be able to see the
+sphere when it's underwater. Refraction is similar to reflection in
+that we do another ray march, but this time we first bend the ray
+according to the refractive index of water, giving [[fig:refraction][this]] effect.
 
 * Realistic waves
 <<sec:realisticwaves>>
@@ -165,15 +151,15 @@ looks to be flowing in the pseudorandom motion water does in reality.
 Our waves still look like plastic, much due to a weakness with the
 specular shading from the phong lighting, and the fact that the water
 still has intrinsic color. Now, let's set the default color of water
-to ~0.00, 0.00, 0.04~, to resemble the darkness below, and make sure
-we only color the water by the color of the reflected sky. If we also
-lay a sheet of rain on the screen according to the noise texture, as
-well as spreading some splashes on the water surface in a random
-manner, we are starting to get something that looks like [[fig:okwater][real
-water]]. At this point I was starting to notice one of the major
-disadvantages of ray marching: the performance. Rendering on my
-laptop, which has an integrated graphics card, required me to lower
-the resolution to 512x256.
+to to resemble the darkness below, and make sure we only color the
+water by the color of the reflected sky. If we also lay a sheet of
+rain on the screen according to the noise texture, as well as
+spreading some splashes on the water surface in a random manner. We
+are starting to get something that looks like [[fig:okwater][real water]]. At this
+point I was starting to notice one of the major disadvantages of ray
+marching: the performance. Rendering on my laptop, which has an
+integrated graphics card, required me to lower the resolution to
+512x256.
 
 * Further incremental improvements
 <<sec:furtherimprovements>>
@@ -189,7 +175,7 @@ still procedurally generated). [[fig:improvements][We're getting somewhere]].
 The CPU is mostly idling between the rendering of frames, but we can
 do something about this. Usage of a Fast Fourier Transform is very
 common in shaders. For this project I used FFTW to do an STFT over a
-.wav file of music (stolen from [[https://www.youtube.com/watch?v%3DWeIIrFhrePE][YouTube]]), and set the sphere in the
+.wav file of music (stolen from YouTube[fn:3]), and set the sphere in the
 scene to visualize the lower frequencies of the song (< 30Hz). This
 creates an effect of the sphere expanding on the onset of bass notes,
 especially the kick drum. When expanding the sphere we also see a
@@ -201,21 +187,31 @@ stretch a lot.
 To finish the scene, I decided to combine some SDFs to create a
 periscope that would float across the scene. This is done by combining
 two cylinders with an elongated torus to create the pipes and
-window. They are combined with a smooth union. The pipes are
-made reflective, which looks fairly good, but a more matte, rusty
-surface might make it look less out of place. By doing this modelling
-by hand with SDFs, I got to feel how cumbersome this process is. There
-is a reason we have modelling tools, but I still have an immense
-amount of respect for the demo scene that creates these models
+window. They are combined with a smooth union. The pipes are made
+reflective, which looks fairly good, but a more matte, rusty surface
+might make it look less out of place. By doing this modelling by hand
+with SDFs, I got to feel how cumbersome the process is. There is a
+reason we have modelling tools, but I still have an immense amount of
+respect for the demo sceners that create these models
 procedurally. The final scene can be seen in [[fig:finalscene][this]] screenshot, or in a
-video that I've uploaded to [[https://www.youtube.com/watch?v%3DhDzagq61y1U][YouTube]] The periscope is visible from
-about 8 seconds into the video. YouTube really did a number on the
-quality, so the full quality version is available [[http://folk.ntnu.no/thomaav/graphics/shader.mp4][here]] (recommended
-version -- try with VLC or Chrome, the new Firefox wouldn't play the
-file).
+video that I've uploaded to YouTube[fn:4]. The periscope is visible
+from about 8 seconds into the video. YouTube really did a number on
+the quality, so the full quality version is available[fn:8]
+(recommended version -- try with VLC or Chrome, the new Firefox
+wouldn't play the file).
 
 $\pagebreak$
-* Hide figure numbeirng :noexport:
+* Footnotes
+[fn:1] http://hugi.scene.org/online/hugi37/sphere_tracing.jpg
+[fn:2] http://jamie-wong.com/images/16-07-11/raytrace.png
+[fn:3] https://www.youtube.com/watch?v=WeIIrFhrePE
+[fn:4] https://www.youtube.com/watch?v=hDzagq61y1U
+[fn:5] https://github.com/thomaav/graphics
+[fn:6] https://iquilezles.org/www/index.htm
+[fn:7] https://iquilezles.org/www/articles/distfunctions/distfunctions.htm
+[fn:8] http://folk.ntnu.no/thomaav/graphics/shader.mp4
+
+* Hide figure numbeirng                                            :noexport:
 #+BEGIN_SRC emacs_lisp
  (require 'ox)
  (defun remove-figure-numbering (contents backend info)
@@ -256,6 +252,16 @@ $\pagebreak$
 #+NAME: fig:reflection
 #+ATTR_LATEX: :width 0.99\textwidth
 [[./img/reflection.png]]
+
+#+CAPTION: An example of the numerical precision failing when estimating shadowing on a sphere with displacement. [[sec:water][Back to section]].
+#+NAME: fig:instability
+#+ATTR_LATEX: :width 0.99\textwidth
+[[./img/instability.png]]
+
+#+CAPTION: Another image of the numerical precision failing when estimating shadowing on a sinc wave. [[sec:water][Back to section]].
+#+NAME: fig:instability2
+#+ATTR_LATEX: :width 0.99\textwidth
+[[./img/instability2.png]]
 
 #+CAPTION: Refractive water surface. http://folk.ntnu.no/thomaav/graphics/refraction.gif. [[sec:water][Back to section]].
 #+NAME: fig:refraction

@@ -1,4 +1,4 @@
-% Created 2019-04-07 Sun 22:03
+% Created 2019-04-08 Mon 13:32
 \documentclass[abstract=off,oneside]{scrreprt}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -32,37 +32,27 @@
 \section*{Introduction}
 \label{sec-1}
 I've been interested in the world of ray marching for a while, in
-particular the fantastic work of Inigo Quilez (found \href{https://iquilezles.org/www/index.htm}{here}). His blog
-explains an enormous amount of techniques to create unbelievable
-procedural scenes, using only a fragment shader. Most of these shaders
-are hosted at Shadertoy.com, which is an online tool for sharing
-shaders with WebGL. Code from other shaders I have been inspired by
-are all credited in comments in the source code.
+particular the fantastic work of Inigo Quilez\footnote{\url{https://iquilezles.org/www/index.htm}}. His blog explains
+an enormous amount of techniques to create unbelievable procedural
+scenes. Most of these shaders are hosted at Shadertoy.com, which is an
+online tool for sharing shaders with WebGL. Code from other shaders I
+have been inspired by are all credited in comments in the source code.
 \\\\
 My primary goal for this project thus became to create interesting
-fragment shaders. This means that the only thing I'm allowed to pass
-into the vertex shader is a \emph{single quad} that covers the
-entire screen -- all the fragment shader has to work with is
-\verb~gl_FragCoord~ (with some exceptions, more on that later).
-\\\\
-For this report I will go through the process step by step, from the
-baby steps required to render a simple sphere, to the final leaps that
-render a realistic looking scene. There are quite a few illustratory
-images, which reside in the appendix, with links back and forth to
-make the reading bearable. Limitations with the techniques, as well as
-problems encountered will be pointed out along the way.
+fragment shaders, primarily using \verb~gl_FragCoord~.  For this report I
+will go through the process step by step, from the baby steps required
+to render a simple sphere, to the final leaps that render a realistic
+looking scene. Limitations of the techniques, as well as problems
+encountered will be pointed out along the way.
 
 \section*{Building the project}
 \label{sec-2}
-The project uses CMake for the building process, as is required for
-the assignment. I've also taken the liberty of adding three libraries
-to use sound: OpenAL Soft , freealut and FFTW. OpenAL and freealut are
-added as submodules with Git, while FFTW is added as an external
-project in CMake, which fetches a tarball online, then extracts and
-builds the library. Building thus takes a little while, but it's not
-too painful. This has been tested with the package repositories found
-in Ubuntu 18.04 and Debian Stretch, and should hopefully work right
-out of the box.
+The project uses CMake (Gloom) for the building process, as is
+required for the assignment. I've also taken the liberty of adding
+three libraries to use sound: OpenAL Soft, freealut and FFTW. OpenAL
+and freealut are added as submodules with Git, while FFTW is added as
+an external project in CMake. I suggest pulling the repository from
+GitHub\footnote{\url{https://github.com/thomaav/graphics}}, as this has been tested to work cleanly from scratch.
 
 \section*{Ray Marching}
 \label{sec-3}
@@ -76,50 +66,49 @@ infinitesimal binary executables, as all that's required are the
 underlying mathematical formulas.
 \\\\
 A signed distance function, let's say a sphere centered at the origin,
-$f(x, y, z) = \sqrt{x^2 + y^2 + z^2} - 1$, for this example, can be
-used to determine whether a point is inside or outside an object, as
-well as the distance to the object if it is outside. This is in
-contrast to more well known ray tracing implementations that have to
-check for intersections with quite a lot of primitives (like
-triangles).
+$f(x, y, z) = \sqrt{x^2 + y^2 + z^2} - 1$, can be used to determine
+whether a point is inside or outside an object, as well as the
+distance to the object if it is outside. This is in contrast to more
+well known ray tracing implementations that have to check for
+intersections with quite a lot of primitives.
 \\\\
-It's time to explain the workings of the method. In \verb~simple.frag~,
-there is a function, \verb~sd_sphere~, that takes a point and a radius as
-arguments, and returns the distance to its perimeter. Below are two
-illustrations I have found to explain the method the best.
+So how does this work in practice? In \verb~simple.frag~, there is a
+function, \verb~sd_sphere~, that takes a point and a radius as arguments,
+and returns the distance to the sphere's perimeter. This is becoming
+interesting: below are two illustrations I have found to explain the
+further steps the best.
 \\\\
 \includegraphics[width=0.45\textwidth]{./img/raytrace.png}
 $\hspace{35pt}$
 \includegraphics[width=0.45\textwidth]{./img/sphere_tracing.jpg}
 \\\\
-The \href{http://jamie-wong.com/images/16-07-11/raytrace.png}{left} image shows how rays are traced from a camera. The \href{http://hugi.scene.org/online/hugi37/sphere_tracing.jpg}{right}
-image illustrates how the iterative steps are taken by the ray
-marching algorithm according to the distance to the object closest to
-the current point.
+The left\footnote{\url{http://hugi.scene.org/online/hugi37/sphere_tracing.jpg}} image shows how rays are traced from a camera. The
+right\footnote{\url{http://jamie-wong.com/images/16-07-11/raytrace.png}} image illustrates how the iterative steps are taken by the
+ray marching algorithm according to the distance to the object closest
+to the current point.
 
 \section*{Humble beginnings}
 \label{sec-4}
 \label{sec:beginnings}
 Let's put our new knowledge to a test -- the execution of the ray
 marching algorithm is found in any of the \verb~trace_<object>~
-functions. A simple rendering of a sphere with some simple phong
-shading is shown in \hyperref[fig:simplesphere]{this image}. Spheres are just the beginning; we
-have SDFs for a wide range of shapes: \href{https://iquilezles.org/www/articles/distfunctions/distfunctions.htm}{link}.
+functions. A simple rendering of a sphere with some phong shading is
+shown in \hyperref[fig:simplesphere]{this image}. Spheres are just the beginning; we have SDFs for
+a wide range of shapes\footnote{\url{https://iquilezles.org/www/articles/distfunctions/distfunctions.htm}}.
 
 \section*{Setting the stage}
 \label{sec-5}
 \label{sec:creatingascene}
-So we have a method of rendering a single object, in this case a
-sphere. How do we go about turning this into a complex scene? The
-first trick we will pull out of our sleeve is intersections and
-unions. If we compute the distance to more than one object, and then
-do \verb~max~ (intersect) or \verb~min~ (union) between them, we can have
-multiple objects in our scene. The technique can be seen in action
-\hyperref[fig:union]{here}. A problem I encountered at this stage was using GLSL
-effictively. I practically gave up on optimization, but most of all I
-was missing the ability to pass around function pointers for distance
-functions (which could perhaps be done with \verb~switch~ statements
-anyway, as I'm already murdering the performance with all the
+So we have a method of rendering a single sphere. How do we go about
+turning this into a complex scene? The first trick we will pull out of
+our sleeve is intersections and unions. If we compute the distance to
+more than one object, and then do \verb~max~ (intersect) or \verb~min~ (union)
+between them, we can have multiple objects in our scene. The technique
+can be seen in action \hyperref[fig:union]{here}. A problem I encountered at this stage was
+using GLSL effictively. I practically gave up on optimization, but
+most of all I was missing the ability to pass around function pointers
+for distance functions (which could perhaps be done with \verb~switch~
+statements anyway, as I'm already murdering the performance with
 conditionals).
 
 \section*{Shadows}
@@ -155,26 +144,23 @@ wall).
 \section*{Reflection and refraction}
 \label{sec-8}
 \label{sec:water}
-Water is for many the first thing to try out when learning shading,
-and this is no exception. Planes can easily be represented as SDFs
-with a single height value, and wave-like displacements can be added
-with a simple sine, as can be seen \hyperref[fig:simplewater]{here}. Adding reflection is no
-harder than adding shadows -- we simply march again from points of
-intersection in a reflected direction, and mix the reflection color
-with the reflective surface color (\hyperref[fig:reflection]{example}). We also add a fresnel
-effect such that steeper angles give weaker reflections. At this point
-I started noticing how optimizing ray marching could give numerical
-instability, especially when estimating the normals of a \emph{sinc} wave
-for lighting purposes. This is a weakness with ray marching, as we
-have to estimate the normal, as opposed to it being passed into the
-rendering pipeline.
+Planes can easily be represented as SDFs with a single height value,
+and wave-like displacements can be added with a simple sine, as can be
+seen \hyperref[fig:simplewater]{here}. Adding reflection is no harder than adding shadows -- we
+simply march again from points of intersection in a reflected
+direction, and mix the reflection color with the reflective surface
+color (\hyperref[fig:reflection]{example}). We also add a fresnel effect such that steeper angles
+give weaker reflections. At this point I started noticing how
+optimizing ray marching could give numerical \hyperref[fig:instability]{instability}, especially
+when estimating the normals of a \hyperref[fig:instability2]{sinc wave} for lighting purposes. This
+is a weakness with ray marching, as we have to estimate the normal, as
+opposed to it being passed into the rendering pipeline.
 \\\\
 Another important effect to add when working with water is
-refraction. Water is colorless (i.e. transparent), so we should be
-able to see the sphere when it's underwater. Refraction is similar to
-reflection in that we do another ray march, but this time we first
-bend the ray according to the refractive index of water, giving
-\hyperref[fig:refraction]{this} effect.
+refraction. Water is transparent, so we should be able to see the
+sphere when it's underwater. Refraction is similar to reflection in
+that we do another ray march, but this time we first bend the ray
+according to the refractive index of water, giving \hyperref[fig:refraction]{this} effect.
 
 \section*{Realistic waves}
 \label{sec-9}
@@ -193,15 +179,15 @@ looks to be flowing in the pseudorandom motion water does in reality.
 Our waves still look like plastic, much due to a weakness with the
 specular shading from the phong lighting, and the fact that the water
 still has intrinsic color. Now, let's set the default color of water
-to \verb~0.00, 0.00, 0.04~, to resemble the darkness below, and make sure
-we only color the water by the color of the reflected sky. If we also
-lay a sheet of rain on the screen according to the noise texture, as
-well as spreading some splashes on the water surface in a random
-manner, we are starting to get something that looks like \hyperref[fig:okwater]{real
-water}. At this point I was starting to notice one of the major
-disadvantages of ray marching: the performance. Rendering on my
-laptop, which has an integrated graphics card, required me to lower
-the resolution to 512x256.
+to to resemble the darkness below, and make sure we only color the
+water by the color of the reflected sky. If we also lay a sheet of
+rain on the screen according to the noise texture, as well as
+spreading some splashes on the water surface in a random manner. We
+are starting to get something that looks like \hyperref[fig:okwater]{real water}. At this
+point I was starting to notice one of the major disadvantages of ray
+marching: the performance. Rendering on my laptop, which has an
+integrated graphics card, required me to lower the resolution to
+512x256.
 
 \section*{Further incremental improvements}
 \label{sec-11}
@@ -219,7 +205,7 @@ still procedurally generated). \hyperref[fig:improvements]{We're getting somewhe
 The CPU is mostly idling between the rendering of frames, but we can
 do something about this. Usage of a Fast Fourier Transform is very
 common in shaders. For this project I used FFTW to do an STFT over a
-.wav file of music (stolen from \href{https://www.youtube.com/watch?v\%3DWeIIrFhrePE}{YouTube}), and set the sphere in the
+.wav file of music (stolen from YouTube\footnote{\url{https://www.youtube.com/watch?v=WeIIrFhrePE}}), and set the sphere in the
 scene to visualize the lower frequencies of the song (< 30Hz). This
 creates an effect of the sphere expanding on the onset of bass notes,
 especially the kick drum. When expanding the sphere we also see a
@@ -237,11 +223,11 @@ made reflective, which looks fairly good, but a more matte, rusty
 surface might make it look less out of place. By doing this modelling
 by hand with SDFs, I got to feel how cumbersome this process is. There
 is a reason we have modelling tools, but I still have an immense
-amount of respect for the demo scene that creates these models
+amount of respect for the demo sceners that create these models
 procedurally. The final scene can be seen in \hyperref[fig:finalscene]{this} screenshot, or in a
-video that I've uploaded to \href{https://www.youtube.com/watch?v\%3DhDzagq61y1U}{YouTube} The periscope is visible from
+video that I've uploaded to YouTube\footnote{\url{https://www.youtube.com/watch?v=hDzagq61y1U}}. The periscope is visible from
 about 8 seconds into the video. YouTube really did a number on the
-quality, so the full quality version is available \href{http://folk.ntnu.no/thomaav/graphics/shader.mp4}{here} (recommended
+quality, so the full quality version is available\footnote{\url{http://folk.ntnu.no/thomaav/graphics/shader.mp4}} (recommended
 version -- try with VLC or Chrome, the new Firefox wouldn't play the
 file).
 
@@ -282,6 +268,18 @@ $\pagebreak$
 \centering
 \includegraphics[width=0.99\textwidth]{./img/reflection.png}
 \caption*{\label{fig:reflection}Reflection on the water surface, gif found at: \url{http://folk.ntnu.no/thomaav/graphics/reflection.gif}. \hyperref[sec:water]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/instability.png}
+\caption*{\label{fig:instability}An example of the numerical precision failing when estimating shadowing on a sphere with displacement. \hyperref[sec:water]{Back to section}.}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.99\textwidth]{./img/instability2.png}
+\caption*{\label{fig:instability2}Another image of the numerical precision failing when estimating shadowing on a sinc wave. \hyperref[sec:water]{Back to section}.}
 \end{figure}
 
 \begin{figure}[htb]

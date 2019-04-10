@@ -1,6 +1,6 @@
 # shades
 
-[![](report/img/finalscene)](http://folk.ntnu.no/thomaav/graphics/shader.mp4)
+[![](report/img/finalscene.png)](http://folk.ntnu.no/thomaav/graphics/shader.mp4)
 
 ## Building
 

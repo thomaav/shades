@@ -1,4 +1,4 @@
-#version 430 core
+#version 450 core
 
 out vec4 color;
 
@@ -53,7 +53,7 @@ vec3 global_light_pos = vec3(10.0f, 8.0f, -10.0f);
 // #define SHADOW
 // #define AO
 #define RAIN
-#define RAIN_SPLASH
+// #define RAIN_SPLASH
 #define CLOUDS
 #define PLANET
 #define LIGHTNING

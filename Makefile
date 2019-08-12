@@ -3,7 +3,7 @@ CXX:=clang++
 INC:=-Ivendor/glad/include/ -Ivendor/stb/include/
 
 CFLAGS:=-Wall -Wextra -std=c++14 -g ${INC} -MD
-LDLIBS:=-lfftw3 -lopenal -lalut -pthread -ldl -lglfw
+LDLIBS:=-ldl -lglfw
 
 OBJ_DIR:=objects
 OBJS=$(patsubst %.cpp, $(OBJ_DIR)/%.o, $(wildcard src/*.cpp))

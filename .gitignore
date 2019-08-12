@@ -1,2 +1,6 @@
 [Bb]uild/*
 !*/.gitkeep
+/objects
+/shades
+/.ccls-cache
+compile_commands.json
